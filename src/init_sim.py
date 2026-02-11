@@ -1,20 +1,8 @@
-"""jemss.init_sim
-
-Initialise a :class:`~jemss.simulator.Simulation` from a Julia-style ``simConfig`` XML.
-
-As of *Step 7*, this also:
-
-* initialises station occupancy statistics
-* creates the initial future-event list:
-  - first call arrival event
-  - (optional) ambulance wake-up events
-  - (optional) tour-window active/inactive events (FDNY fork behaviour)
-"""
-
 from __future__ import annotations
 
 import math
 import random
+import tqdm
 from typing import Optional
 
 from .config import SimConfig, load_sim_config

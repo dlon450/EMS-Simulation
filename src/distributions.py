@@ -1,31 +1,3 @@
-"""jemss.distributions
-
-Small, safe parser + sampler for a subset of Julia ``Distributions.jl``
-expressions.
-
-The upstream Julia simulator stores distribution *objects* in input files via
-string expressions such as ``"Normal(0, 1)"`` or ``"Exponential(0.5)"`` and
-constructs them with ``Meta.parse |> eval``.
-
-In Python we **do not** evaluate arbitrary code.  Instead this module parses a
-small, explicit subset of distribution expressions and provides sampling using
-Python's standard library :mod:`random`.
-
-Supported expressions (case-sensitive, Julia-style):
-
-* ``Normal(μ, σ)``
-* ``LogNormal(μ, σ)``
-* ``Uniform(a, b)``
-* ``Exponential(θ)``  (scale/mean θ)
-* ``Gamma(k, θ)``     (shape k, scale θ)
-* ``Erlang(k, θ)``    (alias of ``Gamma`` with integer shape)
-* ``Weibull(k, θ)``   (shape k, scale θ)
-* ``truncated(d, lo, hi)`` where ``d`` is one of the above
-* ``Constant(x)`` / ``Deterministic(x)``
-
-If an unsupported expression is encountered, a :class:`ValueError` is raised.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

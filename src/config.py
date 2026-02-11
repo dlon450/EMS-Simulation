@@ -1,19 +1,3 @@
-"""jemss.config
-
-Step 2: configuration file parsing.
-
-The Julia project uses an XML ``simConfig`` file to describe where to
-find the simulation input tables, where to write outputs, and a handful
-of run-time options. The heavy lifting of reading the simulation data
-and constructing the network happens later (``initSim`` in Julia).
-
-In this Python port we start by implementing the configuration layer in a way that's:
-
-* faithful to the XML structure used by Julia (e.g., <simFiles> with child tags for each file)
-* safe (no arbitrary expression evaluation)
-* explicit about path interpolation and base directories
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

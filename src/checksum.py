@@ -1,17 +1,3 @@
-"""jemss.checksum
-
-CRC32c (Castagnoli) checksums.
-
-The Julia implementation uses ``CRC32c.crc32c`` over an mmap of the
-file. Python's standard library exposes CRC32 (IEEE polynomial) but not
-CRC32c. To preserve compatibility with the Julia output and resimulation
-support, we implement CRC32c here in pure Python.
-
-The reference check value is:
-
-* crc32c(b"123456789") == 0xE3069283
-"""
-
 from __future__ import annotations
 
 from functools import lru_cache

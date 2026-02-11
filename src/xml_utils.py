@@ -1,19 +1,3 @@
-"""jemss.xml_utils
-
-Small XML helper functions mirroring the convenience helpers in
-``file/file_io.jl``.
-
-The Julia implementation uses LightXML / EzXML and evaluates element
-contents as Julia expressions for some fields. In Python we keep things
-explicit and safe:
-
-* ``elt_text`` returns stripped text.
-* ``elt_value`` parses primitive values (bool, int, float, None) and
-  simple list syntax.
-* ``elt_interp_text`` supports $var substitution using
-  :class:`string.Template`.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

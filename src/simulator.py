@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 import random
+import sys
+import time as wall_time
 
 from .defs import (
     AmbStatus,
@@ -265,8 +267,15 @@ class Simulation:
         time: float = float("inf"),
         duration: float = float("inf"),
         num_events: int = -1,
+        do_print: bool = False,
+        printing_interval: float = 0.1,
     ) -> bool:
-        """Run until completion or until a stop condition is met."""
+        """Run until completion or until a stop condition is met.
+
+        If ``do_print`` is true, progress is printed on a single line and
+        refreshed each time simulation time advances by ``printing_interval``
+        (same units as sim time; typically days).
+        """
 
         if self.time is None and self.start_time is not None:
             self.time = self.start_time
@@ -277,14 +286,45 @@ class Simulation:
         event_count = 0
         max_events = num_events if num_events >= 0 else float("inf")
 
+        if do_print and printing_interval <= 0:
+            raise ValueError("printing_interval must be > 0 when do_print=True")
+
+        sim_start_time = float(self.start_time if self.start_time is not None else (self.time or 0.0))
+        real_start_time = wall_time.time()
+        next_print_sim_time = float(self.time or 0.0) + float(printing_interval)
+
+        def print_progress() -> None:
+            if not do_print:
+                return
+            sim_t = float(self.time or 0.0)
+            sim_duration = sim_t - sim_start_time
+            real_duration = wall_time.time() - real_start_time
+            sys.stdout.write(
+                f"\rsim time: {sim_t:<9.2f} "
+                f"sim duration: {sim_duration:<9.2f} "
+                f"events simulated: {event_count:<9d} "
+                f"real duration: {real_duration:.2f} seconds"
+            )
+            sys.stdout.flush()
+
         while not self.complete and self.event_list and float(self.event_list[-1].time or 0.0) <= time and event_count < max_events:
             self.simulate_next_event()
             event_count += 1
+
+            if do_print and self.time is not None and float(self.time) >= next_print_sim_time:
+                print_progress()
+                while next_print_sim_time <= float(self.time):
+                    next_print_sim_time += float(printing_interval)
 
         if not self.event_list and not self.complete:
             # no more events
             self.complete = True
             self.end_time = self.time
+
+        if do_print:
+            print_progress()
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
         return self.complete
 

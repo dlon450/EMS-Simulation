@@ -1,20 +1,3 @@
-"""jemss.trace
-
-Step 9: lightweight tracing utilities for determinism/validation.
-
-The Julia implementation can write an events trace (via ``EventsFile``) that is
-useful for debugging and resimulation. This module provides a similar concept
-for the Python port:
-
-* record executed events
-* optionally store event rows in memory
-* optionally compute a stable digest for fast regression checks
-
-The digest is intentionally sensitive: it hashes the binary representation of
-event fields (including ``time`` as a float64). Any change in event ordering or
-timing will change the digest.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

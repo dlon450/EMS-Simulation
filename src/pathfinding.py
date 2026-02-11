@@ -1,26 +1,3 @@
-"""jemss.pathfinding
-
-Step 5: dynamic shortest-path backend.
-
-The original Julia implementation relies heavily on precomputed shortest
-path structures for performance (e.g. reduced networks and all-pairs
-tables).  Those precomputations are not available yet in the Python port
-(and some are stored in Julia's binary serialization format).
-
-This module provides a **runtime** shortest-path engine based on
-Dijkstra's algorithm with a small LRU cache.  It is intended to be used
-for:
-
-* dispatch decisions (travel time between nodes)
-* route construction (node/arc paths)
-
-It assumes:
-
-* positive arc travel times
-* 1-based node and arc indexing (index 0 is a dummy), matching the Julia
-  input tables
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field

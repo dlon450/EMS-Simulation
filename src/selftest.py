@@ -1,17 +1,3 @@
-"""jemss.selftest
-
-Step 9: small self-tests for deterministic behaviour.
-
-These are intentionally lightweight (no pytest dependency). They can be run via:
-
-    python -c "from jemss.selftest import run_all; run_all()"
-
-The tests focus on the pieces most likely to cause diverging traces:
-
-* event-list ordering / same-time tie-breaking
-* distribution seeding when seed=-1 (random seed)
-"""
-
 from __future__ import annotations
 
 import random

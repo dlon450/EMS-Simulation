@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<simConfig>
+  <inputPath>../data/bronx</inputPath>
+  <outputPath>../output/bronx</outputPath>
+
+  <simFiles>
+    <ambulances>ambulances.csv</ambulances>
+    <hospitals>hospitals.csv</hospitals>
+    <stations>stations.csv</stations>
+    <calls>calls.csv</calls>
+    <arcs>arcs.csv</arcs>
+    <nodes>nodes.csv</nodes>
+    <map>map.csv</map>
+    <priorities>priorities.csv</priorities>
+    <travel>travel.csv</travel>
+  </simFiles>
+
+  <writeOutput>false</writeOutput>
+  <outputFiles>
+    <events>events.csv</events>
+    <ambulances>ambulances.csv</ambulances>
+    <calls>calls.csv</calls>
+    <hospitals>hospitals.csv</hospitals>
+    <ambulancesStats>ambulances_stats.csv</ambulancesStats>
+    <callsStats>calls_stats.csv</callsStats>
+    <hospitalsStats>hospitals_stats.csv</hospitalsStats>
+    <stationsStats>stations_stats.csv</stationsStats>
+    <statsDict>stats_dict.csv</statsDict>
+  </outputFiles>
+
+  <resim>false</resim>
+
+  <decision>
+    <callQueueing>addCallToQueueSortPriorityThenTime!</callQueueing>
+    <dispatch>findNearestDispatchableAmbALSBLS!</dispatch>
+    <moveUp>
+      <module>none</module>
+    </moveUp>
+  </decision>
+</simConfig>

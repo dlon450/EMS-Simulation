@@ -1,20 +1,3 @@
-"""jemss.write_sim_files
-
-Step 10: Julia-compatible output writers.
-
-The upstream Julia implementation writes most outputs as one or more named
-tables in a single delimited file (see :mod:`jemss.file_io`). The *events* file
-is special: it starts with a couple of tables (inputFiles, eventDict), then
-streams one row per executed event.
-
-This module focuses on producing outputs that are easy to diff against the
-Julia outputs. It keeps:
-
-* table names/headers aligned to Julia's writers
-* sentinel values aligned (``nullIndex=-1``, ``nullTime=-1.0``)
-* event keys aligned to Julia's ``EventForm`` numbering (0-based)
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

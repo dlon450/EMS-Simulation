@@ -1,22 +1,3 @@
-"""jemss.file_io
-
-Step 2 of the port: file-format utilities.
-
-The Julia codebase uses a lightweight "tables file" format that can
-contain multiple named tables in a single delimited file. Each table is
-written as:
-
-1. A *table header line* containing:
-   ``<tableName>,<numRows>,<numCols>,`` (row/col counts may be blank)
-2. A *column header line* containing the column names.
-3. ``numRows`` data lines.
-4. A blank separator line.
-
-In Julia this is implemented in ``file/file_io.jl`` via :func:`readdlm`.
-This module provides a Python equivalent that preserves the overall file
-structure while using Pythonic containers.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,11 +1,3 @@
-"""Miscellaneous small types and placeholders.
-
-At this stage of the port, this module mainly provides small container
-types (e.g. :class:`File`) and placeholders for concepts that will be
-implemented later (e.g. histogram support, XML elements, distribution
-wrappers).
-"""
-
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 

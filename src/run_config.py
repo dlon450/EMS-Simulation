@@ -1,18 +1,3 @@
-"""jemss.run_config
-
-Convenience wrapper mirroring Julia's ``runConfig`` entry point.
-
-Julia's default CLI flow is:
-
-1. ``initSim`` (reads config + input tables)
-2. ``openOutputFiles!`` (opens events file and writes its headers)
-3. ``simulate!``
-4. ``closeOutputFiles!``
-5. ``writeOutputFiles`` (writes post-simulation outputs)
-
-This module provides a similar helper for the Python port.
-"""
-
 from __future__ import annotations
 
 from typing import Optional
@@ -27,8 +12,9 @@ def run_config(
     allow_write_output: bool = True,
     compute_checksums: bool = True,
     do_print: bool = False,
+    printing_interval: float = 0.1,
     seed: Optional[int] = None,
-) -> "Simulation":
+):
     """Run a simulation from a Julia-style simConfig XML.
 
     Returns the populated :class:`~jemss.simulator.Simulation`.
@@ -41,11 +27,11 @@ def run_config(
         do_print=do_print,
         seed=seed,
     )
-
+    
     if sim.write_output:
         open_output_files(sim)
 
-    sim.simulate()
+    sim.simulate(do_print=do_print, printing_interval=printing_interval)
 
     if sim.write_output:
         close_output_files(sim)

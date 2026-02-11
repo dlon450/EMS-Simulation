@@ -1,18 +1,3 @@
-"""jemss.golden
-
-Step 9: small utilities for *repeatable* simulator runs.
-
-This module is designed to help you:
-
-* run a scenario from a simConfig XML
-* compute a compact JSON-serialisable summary of outcomes
-* optionally compute an event-trace digest for regression testing
-
-The intent is that you can run the Julia simulator and the Python simulator on
-the same scenario and compare a small set of key outputs (counts, mean response
-times, event trace digest, etc.).
-"""
-
 from __future__ import annotations
 
 from dataclasses import asdict

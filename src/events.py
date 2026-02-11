@@ -1,15 +1,3 @@
-"""Event types.
-
-This module exists to avoid circular imports:
-
-* ``Simulation`` needs the :class:`~jemss.events.Event` type to manage the
-  future-event list.
-* Entities such as :class:`~jemss.entities.Ambulance` store their next event.
-
-By placing ``Event`` in its own module, both layers can import it without
-depending on each other.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

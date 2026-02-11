@@ -1,20 +1,3 @@
-"""jemss.read_sim_files
-
-Step 3 of the port: read simulation *input tables* into domain objects.
-
-This module ports the Julia functions in ``src/file/read_sim_files.jl``.
-Network *construction* (graph initialisation, reduced network creation,
-shortest paths, etc.) is intentionally deferred.
-
-Conventions (aligned with the Julia codebase):
-
-* Most domain objects have an explicit ``index`` field starting at 1.
-  We return Python lists with a dummy element at index 0 so that
-  ``items[i]`` matches Julia's 1-based indexing.
-* Optional numeric values that are blank/missing in input files are
-  represented as ``None`` (rather than Julia's ``nullTime`` etc.).
-"""
-
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple

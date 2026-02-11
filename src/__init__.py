@@ -1,11 +1,3 @@
-"""JEMSS EMS simulator (Python port).
-
-This package is an incremental translation of the Julia JEMSS.jl codebase.
-
-Step 1 focuses on **module ownership** and an **acyclic import graph** so the
-package can be imported cleanly while we port functionality module-by-module.
-"""
-
 # Re-export commonly used enums/types for convenience.
 
 from .defs import (  # noqa: F401
