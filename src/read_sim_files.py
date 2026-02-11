@@ -56,7 +56,7 @@ _PRIORITY_TOKEN_MAP: Dict[str, Priority] = {
 
 
 def parse_priority_token(x: Any) -> Priority:
-    """Parse a priority token as found in Julia input tables.
+    """Parse a priority token as found in reference input tables.
 
     Supports ints (1..), :class:`Priority` values, and strings such as
     ``"highPriority"``, ``"Priority.HIGH"``, or ``"HIGH"``.
@@ -81,7 +81,7 @@ def parse_priority_token(x: Any) -> Priority:
 
     su = s.upper()
 
-    # Julia enum string forms: highPriority, medPriority, lowPriority
+    # reference enum string forms: highPriority, medPriority, lowPriority
     if su in _PRIORITY_TOKEN_MAP:
         return _PRIORITY_TOKEN_MAP[su]
 
@@ -100,7 +100,7 @@ def parse_priority_token(x: Any) -> Priority:
 _AMB_CLASS_TOKEN_MAP: Dict[str, AmbClass] = {
     "ALS": AmbClass.ALS,
     "BLS": AmbClass.BLS,
-    # Julia enum names are lowercase: als/bls
+    # reference enum names are lowercase: als/bls
     "ALS".lower().upper(): AmbClass.ALS,
     "BLS".lower().upper(): AmbClass.BLS,
     "ALS".upper(): AmbClass.ALS,
@@ -137,7 +137,7 @@ _AMB_CLASS_TOKEN_MAP: Dict[str, AmbClass] = {
     "BLS".upper(): AmbClass.BLS,
     "ALS".upper(): AmbClass.ALS,
     "BLS".upper(): AmbClass.BLS,
-    # common Julia string(AmbClass) values
+    # common reference string(AmbClass) values
     "ALS".replace("ALS", "ALS").upper(): AmbClass.ALS,
     "BLS".replace("BLS", "BLS").upper(): AmbClass.BLS,
     "ALS".upper(): AmbClass.ALS,
@@ -200,7 +200,7 @@ _AMB_CLASS_TOKEN_MAP: Dict[str, AmbClass] = {
     "BLS".upper(): AmbClass.BLS,
     "ALS".upper(): AmbClass.ALS,
     "BLS".upper(): AmbClass.BLS,
-    # Julia exact enum strings: "als" / "bls"
+    # reference exact enum strings: "als" / "bls"
     "ALS".lower().upper(): AmbClass.ALS,
     "BLS".lower().upper(): AmbClass.BLS,
     "ALS".lower().upper(): AmbClass.ALS,
@@ -354,12 +354,12 @@ def read_stations_file(filename: str) -> List[Station]:
 
 
 def _parse_optional_hospital_index(x: Any) -> Optional[int]:
-    # Mirrors Julia parseHosp.
+    # Mirrors reference parseHosp.
     if _is_missing(x):
         return None
     if isinstance(x, str) and x.strip() == "":
         return None
-    # Julia uses nullIndex = -1; convert to Pythonic None.
+    # reference uses nullIndex = -1; convert to Pythonic None.
     if isinstance(x, (int, float)) and not (isinstance(x, float) and math.isnan(x)):
         if int(x) == -1:
             return None
@@ -410,7 +410,7 @@ def read_calls_file(filename: str) -> Tuple[List[Call], float]:
         elif isinstance(rec, str) and rec.strip().upper() == "BLS":
             call.recommended_amb_class = AmbClass.BLS
         else:
-            # default to BLS for compatibility with Julia's else branch
+            # default to BLS for compatibility with reference's else branch
             call.recommended_amb_class = AmbClass.BLS
 
         call.attributes = attrs[row_i]
@@ -451,7 +451,7 @@ def read_calls_file(filename: str) -> Tuple[List[Call], float]:
         if not all(call.dispatch_delay > 0 for call in calls[1:]):
             raise ValueError(
                 "Calls have equal arrival times and some dispatchDelay == 0; "
-                "this can cause priority-ordering bugs (mirrors Julia assertion)."
+                "this can cause priority-ordering bugs (mirrors reference assertion)."
             )
 
     return calls, start_time
@@ -543,7 +543,7 @@ def read_arcs_file(filename: str, *, keep_all_fields: bool = False) -> Tuple[Lis
         if arc.index != i:
             raise ValueError(f"Arc index mismatch at row {i}: got {arc.index}")
         if has_dist and (arc.distance is None or not (arc.distance >= 0)):
-            # Note: NaN fails the >= check, mirroring Julia's assertion.
+            # Note: NaN fails the >= check, mirroring reference's assertion.
             raise ValueError(f"Arc distance must be >= 0 (arc {arc.index})")
 
         arcs.append(arc)
@@ -677,7 +677,7 @@ def read_travel_file(filename: str) -> Travel:
     num_priorities = len(PRIORITIES)
     travel.mode_lookup = [[0] * (num_priorities + 1) for _ in range(num_sets + 1)]
 
-    # checks analogous to Julia
+    # checks analogous to reference
     if sorted(set(set_indices)) != list(range(1, num_sets + 1)):
         raise ValueError("travelSets must use all travelSetIndex values from 1..numSets")
     if sorted(set(mode_indices)) != list(range(1, travel.num_modes + 1)):
@@ -704,7 +704,7 @@ def read_travel_file(filename: str) -> Travel:
     travel.sets_time_order = [int(x) for x in cols["travelSetIndex"]]
 
     if not travel.sets_start_times or travel.sets_start_times[0] <= -1e9:
-        # Julia checks against nullTime; here we just ensure a real number is present.
+        # reference checks against nullTime; here we just ensure a real number is present.
         raise ValueError("travelSetsTiming startTime must be set")
     if any(travel.sets_start_times[i] > travel.sets_start_times[i + 1] for i in range(len(travel.sets_start_times) - 1)):
         raise ValueError("travelSetsTiming startTime values must be non-decreasing")
@@ -821,13 +821,13 @@ def read_redispatch_file(filename: str) -> Redispatch:
 
 
 def _parse_vector_literal(text: str) -> List[float]:
-    """Parse a simple Julia/Python vector literal like `[1.0, 2.0]`."""
+    """Parse a simple reference/Python vector literal like `[1.0, 2.0]`."""
 
     s = text.strip()
     if s == "":
         raise ValueError("Empty vector literal")
 
-    # Accept Julia booleans too.
+    # Accept reference booleans too.
     s = s.replace("true", "True").replace("false", "False")
 
     try:
@@ -844,7 +844,7 @@ def _parse_vector_literal(text: str) -> List[float]:
 def read_stats_control_file(filename: str) -> Dict[str, Any]:
     """Read stats-control parameters.
 
-    Returns a dict compatible with how the Julia code stores these
+    Returns a dict compatible with how the reference code stores these
     settings (we'll later map this into a structured Python type).
     """
 

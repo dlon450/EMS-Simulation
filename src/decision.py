@@ -18,7 +18,7 @@ def _priority_rank(p: Priority) -> int:
 def add_call_to_queue_sort_priority_then_time(queue: List[Call], call: Call) -> None:
     """Insert *call* into *queue*.
 
-    Mirrors Julia's ``addCallToQueueSortPriorityThenTime!``:
+    Mirrors reference's ``addCallToQueueSortPriorityThenTime!``:
     calls nearer to the end of the list are higher priority and arrived sooner.
     """
 
@@ -59,7 +59,7 @@ def is_amb_redispatchable(sim: "Simulation", amb: Ambulance, from_call: Call, to
 def is_amb_dispatchable(sim: "Simulation", amb: Ambulance, call: Call) -> bool:
     """Whether *amb* can be (re)assigned to *call* now.
 
-    Port of Julia ``isAmbDispatchable``.
+    Port of reference ``isAmbDispatchable``.
     """
 
     if amb.end_current_tour:
@@ -123,7 +123,7 @@ def _estimated_response_duration(sim: "Simulation", amb: Ambulance, call: Call) 
 def find_nearest_dispatchable_amb(sim: "Simulation", call: Call, *, require_recommended_class: bool = False) -> Optional[int]:
     """Return the index of the best ambulance to respond to *call*.
 
-    Port of Julia ``findNearestDispatchableAmb!`` (and the ALS/BLS variant).
+    Port of reference ``findNearestDispatchableAmb!`` (and the ALS/BLS variant).
     """
 
     best_idx: Optional[int] = None

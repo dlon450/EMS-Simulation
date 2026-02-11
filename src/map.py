@@ -59,7 +59,7 @@ def norm_dist(map_: Map, loc1: Location, loc2: Location) -> float:
 def off_road_travel_time(travel_mode: TravelMode, *args: Any) -> float:
     """Compute off-road travel time.
 
-    This mirrors the two Julia methods:
+    This mirrors the two reference methods:
 
     * ``offRoadTravelTime(travelMode, map, loc1, loc2)``
     * ``offRoadTravelTime(travelMode, dist)``
@@ -88,7 +88,7 @@ def linear_interp_location(
 ) -> Location:
     """Linear interpolation between two locations in time.
 
-    Mirrors Julia ``linearInterpLocation``.
+    Mirrors reference ``linearInterpLocation``.
     """
     if not (start_time <= current_time <= end_time and start_time < end_time):
         raise ValueError("Require start_time <= current_time <= end_time and start_time < end_time")
@@ -104,7 +104,7 @@ def linear_interp_location(
 def rand_location(map_: Map, *, trim: float = 0.0, rng: Optional[random.Random] = None) -> Location:
     """Uniform random location within map bounds.
 
-    ``trim`` is the fractional trimming of the border, matching Julia's
+    ``trim`` is the fractional trimming of the border, matching reference's
     ``randLocation(map; trim=...)``.
     """
     if not (0.0 <= trim <= 1.0):
@@ -178,7 +178,7 @@ class Grid:
     @classmethod
     def from_map(cls, map_: Map, nx: int, ny: int) -> "Grid":
         grid = cls(nx=nx, ny=ny)
-        # Use 1-based indexing for rects (index 0 is unused) to mirror Julia.
+        # Use 1-based indexing for rects (index 0 is unused) to mirror reference.
         grid.rects = [[GridRect() for _ in range(ny + 1)] for _ in range(nx + 1)]
         grid.x_range = (map_.x_range or 0.0) / nx if nx > 0 else 0.0
         grid.y_range = (map_.y_range or 0.0) / ny if ny > 0 else 0.0
@@ -190,12 +190,12 @@ class Grid:
 def location_to_grid_index(map_: Map, grid: Grid, location: Location) -> Tuple[int, int]:
     """Return (ix, iy) grid indices for a given location.
 
-    Mirrors Julia ``locationToGridIndex(map, grid, location)``.
+    Mirrors reference ``locationToGridIndex(map, grid, location)``.
 
     Notes
     -----
     * Indices are 1-based.
-    * When ``location.x == map.x_min`` (or y), Julia forces the index to 1.
+    * When ``location.x == map.x_min`` (or y), reference forces the index to 1.
     """
 
     if map_.x_min is None or map_.y_min is None or map_.x_range is None or map_.y_range is None:
@@ -205,7 +205,7 @@ def location_to_grid_index(map_: Map, grid: Grid, location: Location) -> Tuple[i
     if grid.nx <= 0 or grid.ny <= 0:
         raise ValueError("Grid must have positive nx and ny")
 
-    # Julia uses ceil on a 1..nx scale.
+    # reference uses ceil on a 1..nx scale.
     ix = int(math.ceil((location.x - map_.x_min) / map_.x_range * grid.nx))
     iy = int(math.ceil((location.y - map_.y_min) / map_.y_range * grid.ny))
 
@@ -230,7 +230,7 @@ def grid_place_nodes(
 ) -> None:
     """Place node indices into the grid rectangles.
 
-    Mirrors Julia ``gridPlaceNodes!(map, grid, nodes; offRoadAccessRequired=true)``.
+    Mirrors reference ``gridPlaceNodes!(map, grid, nodes; offRoadAccessRequired=true)``.
 
     ``nodes`` is expected to be 1-based (index 0 unused) but this function also
     tolerates 0-based input by skipping nodes where ``node.index`` is falsy.
@@ -258,7 +258,7 @@ def find_nearest_node(
 ) -> Tuple[int, float]:
     """Find the nearest node to ``location`` using the grid.
 
-    Mirrors Julia ``findNearestNode(map, grid, nodes, location)``.
+    Mirrors reference ``findNearestNode(map, grid, nodes, location)``.
 
     Returns
     -------
@@ -317,7 +317,7 @@ def find_nearest_node(
             found = True
         else:
             skip_search = False
-            # Extend the nearest border (tie-break order matches Julia).
+            # Extend the nearest border (tie-break order matches reference).
             if gsr.x_dist[0] == nearest_border_dist:
                 if gsr.ix_searched[0] > 1:
                     gsr.ix_searched[0] -= 1
@@ -377,7 +377,7 @@ def find_nearest_node_linear(
 ) -> Tuple[int, float]:
     """Brute-force nearest-node search.
 
-    This mirrors Julia's slower ``findNearestNode(map, nodes, location)`` and is
+    This mirrors reference's slower ``findNearestNode(map, nodes, location)`` and is
     useful for validating the grid implementation.
     """
 
@@ -472,7 +472,7 @@ class Route:
     # ------------------------------------------------------------------
     # Step 6: full-graph path representation
     # ------------------------------------------------------------------
-    # These fields are **not** part of the original Julia `Route` struct.
+    # These fields are **not** part of the original reference `Route` struct.
     # They let the Python port compute route progression without relying on
     # the reduced graph / precomputed rNetTravels.
 
@@ -508,7 +508,7 @@ class Route:
     def init_at_location(self, *, start_loc: Location, start_fnode: int, start_fnode_dist: float) -> None:
         """Initialise an "empty" route located at ``start_loc``.
 
-        This mirrors the intent of Julia's ``initRoute!``:
+        This mirrors the intent of reference's ``initRoute!``:
 
         * the route is set to an inert state at a location (typically a station)
         * ``start_time`` / ``start_fnode_time`` are set to +∞
@@ -621,7 +621,7 @@ class Route:
     def update_to_time(self, sim: "Simulation", t: float) -> None:
         """Update cached `recent_*`/`next_*` fields for time ``t``.
 
-        This is a simplified analogue of Julia's ``updateRouteToTime!`` that
+        This is a simplified analogue of reference's ``updateRouteToTime!`` that
         uses the stored full-graph `path_*` arrays rather than reduced-network
         rArc metadata.
         """
@@ -641,7 +641,7 @@ class Route:
             self._set_state_before_start_fnode()
             return
 
-        # Julia uses `time <= startFNodeTime` to keep BEFORE_START_NODE on the boundary.
+        # reference uses `time <= startFNodeTime` to keep BEFORE_START_NODE on the boundary.
         if t <= self.start_fnode_time:
             self._set_state_before_start_fnode()
             return
@@ -664,7 +664,7 @@ class Route:
     def current_location(self, sim: "Simulation", t: float) -> Location:
         """Return the route's current location at time ``t``.
 
-        Mirrors Julia's ``getRouteCurrentLocation!``.
+        Mirrors reference's ``getRouteCurrentLocation!``.
         """
 
         self.update_to_time(sim, t)
@@ -723,7 +723,7 @@ class Route:
     def next_node(self, sim: "Simulation", travel_mode_index: int, t: float) -> Tuple[int, float]:
         """Return (next_fnode, time_remaining_to_reach_it) at time ``t``.
 
-        Mirrors Julia's ``getRouteNextNode!``.
+        Mirrors reference's ``getRouteNextNode!``.
         """
 
         self.update_to_time(sim, t)
@@ -751,7 +751,7 @@ class Route:
         travel_time = max(0.0, float(t - self.recent_fnode_time))
 
         # Compatibility: if travel mode changes while off-road after end node,
-        # scale travel time by off-road speeds (mirrors Julia's check).
+        # scale travel time by off-road speeds (mirrors reference's check).
         if self.travel_mode_index is not None and self.travel_mode_index != travel_mode_index:
             old_mode = sim.travel.modes[self.travel_mode_index]
             new_mode = sim.travel.modes[travel_mode_index]
@@ -763,7 +763,7 @@ class Route:
     def next_node_distance(self, sim: "Simulation", t: float) -> float:
         """Distance associated with :meth:`next_node` at time ``t``.
 
-        Mirrors Julia's ``getRouteNextNodeDist!`` semantics:
+        Mirrors reference's ``getRouteNextNodeDist!`` semantics:
 
         * BEFORE_START_NODE: remaining distance to reach start_fnode
         * ON_PATH: remaining distance to reach next_fnode along the current arc
@@ -818,7 +818,7 @@ class Route:
     def distance_travelled(self, sim: "Simulation", t: float) -> float:
         """Distance travelled along the route from route.start_time up to time ``t``.
 
-        Mirrors Julia's ``calcRouteDistance!`` using the stored full-graph path.
+        Mirrors reference's ``calcRouteDistance!`` using the stored full-graph path.
         """
 
         if self.status == RouteStatus.NULL:
@@ -872,7 +872,7 @@ class Route:
     ) -> None:
         """Re-plan this route to travel from the current position to ``end_loc``.
 
-        This is the Python analogue of Julia's ``changeRoute!`` but using the
+        This is the Python analogue of reference's ``changeRoute!`` but using the
         full-graph runtime shortest-path backend.
         """
 
@@ -971,7 +971,7 @@ class Route:
     ) -> float:
         """Compute travel time from the route's current position to a destination.
 
-        This mirrors Julia's ``shortestRouteTravelTime!`` in the common case
+        This mirrors reference's ``shortestRouteTravelTime!`` in the common case
         where we start from an existing route.
         """
 

@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
-# Julia-compatible sentinels
+# reference-compatible sentinels
 # ---------------------------------------------------------------------------
 
 NULL_INDEX: int = -1
@@ -34,7 +34,7 @@ def _json(obj: object) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Name/key mappings (Python enums -> Julia strings/ints)
+# Name/key mappings (Python enums -> reference strings/ints)
 # ---------------------------------------------------------------------------
 
 
@@ -53,7 +53,7 @@ _EVENTFORM_JULIA: Dict[EventForm, tuple[int, str]] = {
     EventForm.AMB_RETURNS_TO_STATION: (11, "ambReturnsToStation"),
     EventForm.AMB_REACHES_STATION: (12, "ambReachesStation"),
     EventForm.CONSIDER_MOVE_UP: (13, "considerMoveUp"),
-    # Julia has ambMoveUpToStation=14; intentionally skipped in this port.
+    # reference has ambMoveUpToStation=14; intentionally skipped in this port.
     EventForm.AMB_RETURNS_TO_CROSS_STREET: (15, "ambReturnsToCrossStreet"),
     EventForm.AMB_REACHES_CROSS_STREET: (16, "ambReachesCrossStreet"),
     EventForm.AMB_BECOMES_INACTIVE: (17, "ambBecomesInactive"),
@@ -105,7 +105,7 @@ def julia_amb_status_set_name(sset: AmbStatusSet) -> str:
     return _AMBSTATUSSET_JULIA_NAME.get(sset, sset.name)
 
 
-# Canonical status order used by the Julia writers.
+# Canonical status order used by the reference writers.
 _AMB_STATUS_ORDER: List[AmbStatus] = [
     AmbStatus.SLEEPING,
     AmbStatus.IDLE_AT_STATION,
@@ -130,7 +130,7 @@ _AMB_STATUS_SET_ORDER: List[AmbStatusSet] = [
     AmbStatusSet.GOING_TO_STATION,
 ]
 
-# Sorted travel-status order used in Julia's stats writer.
+# Sorted travel-status order used in reference's stats writer.
 _AMB_TRAVEL_STATUS_ORDER: List[AmbStatus] = [
     AmbStatus.GOING_TO_CALL,
     AmbStatus.GOING_TO_HOSPITAL,
@@ -141,7 +141,7 @@ _AMB_TRAVEL_STATUS_ORDER: List[AmbStatus] = [
 
 
 # ---------------------------------------------------------------------------
-# Low-level stream writers (Julia-style delimiter + newlines)
+# Low-level stream writers (reference-style delimiter + newlines)
 # ---------------------------------------------------------------------------
 
 
@@ -234,7 +234,7 @@ def open_output_files(sim: "Simulation") -> None:
     sim.output_files["events"].stream = f
     sim.events_file.io = f
 
-    # Save checksum of input files (Julia sorts by key)
+    # Save checksum of input files (reference sorts by key)
     input_names = sorted(sim.input_files.keys())
     checksum_strings = [f"'{sim.input_files[n].checksum}'" for n in input_names]
     input_tbl = Table(name="inputFiles", header=["name", "checksum"], data=list(map(list, zip(input_names, checksum_strings))))
@@ -317,7 +317,7 @@ def write_ambulances_file(filename: str, ambulances: Sequence["Ambulance"], *, w
         "numDispatchesOnRoad",
         "numDispatchesOnFree",
         "numRedispatches",
-        # move-up counts (kept for Julia-format parity)
+        # move-up counts (kept for reference-format parity)
         "numMoveUps",
         "numMoveUpsFromStation",
         "numMoveUpsOnRoad",

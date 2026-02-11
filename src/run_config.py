@@ -15,7 +15,7 @@ def run_config(
     printing_interval: float = 0.1,
     seed: Optional[int] = None,
 ):
-    """Run a simulation from a Julia-style simConfig XML.
+    """Run a simulation from a reference-style simConfig XML.
 
     Returns the populated :class:`~jemss.simulator.Simulation`.
     """
@@ -36,7 +36,7 @@ def run_config(
     if sim.write_output:
         close_output_files(sim)
         write_output_files(sim)
-        # Mirror Julia: disable writing so the same sim can be re-run.
+        # Mirror reference: disable writing so the same sim can be re-run.
         sim.write_output = False
 
     return sim

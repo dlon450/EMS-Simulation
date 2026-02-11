@@ -51,7 +51,7 @@ def init_sim_from_config(cfg: SimConfig, *, do_print: bool = False, seed: Option
 
     # Optional simulation-level seed. This does *not* change behaviour when
     # all distributions have explicit seeds, but it makes runs deterministic
-    # when some files request random seeds (seed < 0), matching Julia's
+    # when some files request random seeds (seed < 0), matching reference's
     # GLOBAL_RNG-driven behaviour.
     if seed is not None:
         sim.rng_seed = int(seed)
@@ -121,7 +121,7 @@ def init_sim_from_config(cfg: SimConfig, *, do_print: bool = False, seed: Option
 
     sim.time = sim.start_time
 
-    # counts (match Julia cached counts; convenient later)
+    # counts (match reference cached counts; convenient later)
     sim.num_ambs = len(sim.ambulances) - 1
     sim.num_calls = len(sim.calls) - 1
     sim.num_hospitals = len(sim.hospitals) - 1
@@ -222,7 +222,7 @@ def init_sim_from_config(cfg: SimConfig, *, do_print: bool = False, seed: Option
         a.dest_loc = station.location
         a.moved_loc = False
 
-        # Mirror Julia's initAmbulance!: if the ambulance has any tour defined,
+        # Mirror reference's initAmbulance!: if the ambulance has any tour defined,
         # add an initial wake-up event at sim.start_time.
         has_tour = any(
             t is not None

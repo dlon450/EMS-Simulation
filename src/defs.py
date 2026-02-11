@@ -7,7 +7,7 @@ from typing import Dict, Set, Tuple
 class Priority(Enum):
     """Call or demand priority.
 
-    Julia models priorities as small 1-based integers.  We keep :class:`Enum`
+    reference models priorities as small 1-based integers.  We keep :class:`Enum`
     values with the same property (``.value`` is 1..N) so they can index
     1-based tables read from the original input files.
     """
@@ -44,7 +44,7 @@ class EventForm(Enum):
     AMB_RETURNS_TO_STATION = auto()
     AMB_REACHES_STATION = auto()
 
-    # Move-up is present in the Julia codebase but intentionally skipped in this port for now.
+    # Move-up is present in the reference codebase but intentionally skipped in this port for now.
     CONSIDER_MOVE_UP = auto()
 
     # Cross-street / tour-window events (FDNY fork behaviour).
@@ -94,7 +94,7 @@ def is_busy(status: AmbStatus) -> bool:
 
 
 def is_free(status: AmbStatus) -> bool:
-    # Mirrors Julia's `isFree` which intentionally includes "going to station"
+    # Mirrors reference's `isFree` which intentionally includes "going to station"
     # states: dispatch can interrupt those routes.
     return status in {
         AmbStatus.IDLE_AT_STATION,
@@ -107,12 +107,12 @@ def is_free(status: AmbStatus) -> bool:
 
 
 def is_working(status: AmbStatus) -> bool:
-    # Julia: `!in(s, (ambNullStatus, ambSleeping))`
+    # reference: `!in(s, (ambNullStatus, ambSleeping))`
     return status not in {AmbStatus.NULL, AmbStatus.SLEEPING}
 
 
 def is_going_to_station(status: AmbStatus) -> bool:
-    # Julia's definition includes RETURNING_TO_CROSS_STREET in the "going-to-station"
+    # reference's definition includes RETURNING_TO_CROSS_STREET in the "going-to-station"
     # family so that an in-progress return can be cancelled by dispatch.
     return status in {
         AmbStatus.RETURNING_TO_STATION,

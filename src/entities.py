@@ -47,7 +47,7 @@ class Station:
     current_num_idle_ambs_set_time: Optional[float] = None
 
     def init_stats(self, *, start_time: float) -> None:
-        # OffsetVector(Float[], 0) in Julia, later resized to capacity+1.
+        # OffsetVector(Float[], 0) in reference, later resized to capacity+1.
         self.num_idle_ambs_total_duration = {k: 0.0 for k in range(0, max(0, self.capacity) + 1)}
         self.current_num_idle_ambs = 0
         self.current_num_idle_ambs_set_time = float(start_time)
@@ -55,7 +55,7 @@ class Station:
     def update_stats(self, *, num_idle_ambs_change: int = 0, time: Optional[float] = None) -> None:
         """Update station idle-ambulance occupancy statistics.
 
-        Mirrors Julia's ``updateStationStats!``.
+        Mirrors reference's ``updateStationStats!``.
         """
 
         if num_idle_ambs_change == 0:
@@ -127,7 +127,7 @@ class Call:
     def set_status(self, status: CallStatus, time: float) -> None:
         """Set the call status and update derived statistics.
 
-        Port of Julia ``setCallStatus!``.
+        Port of reference ``setCallStatus!``.
         """
 
         prev_status = self.status
@@ -252,7 +252,7 @@ class Ambulance:
     def set_status(self, sim: "Simulation", status: AmbStatus, time: float) -> None:
         """Set the ambulance status and update derived statistics.
 
-        Port of Julia ``setAmbStatus!`` (minus move-up bookkeeping).
+        Port of reference ``setAmbStatus!`` (minus move-up bookkeeping).
         """
 
         if self.status_set_time is not None and time < self.status_set_time:

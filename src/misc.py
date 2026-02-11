@@ -12,9 +12,9 @@ from .distributions import ParsedDistribution, parse_distribution_spec
 
 @dataclass
 class DistrRng:
-    """Distribution + RNG wrapper (Julia-compatible intent).
+    """Distribution + RNG wrapper (reference-compatible intent).
 
-    Julia uses ``DistrRng`` to bundle a distribution object with a seeded
+    reference uses ``DistrRng`` to bundle a distribution object with a seeded
     ``MersenneTwister`` so that sampling is deterministic and isolated.
 
     In this Python port, input files store the distribution as a string
@@ -66,7 +66,7 @@ class DistrRng:
 class XMLElement:
     """Placeholder for an XML element object.
 
-    The Julia implementation uses EzXML.jl. In Python we'll likely use
+    The reference implementation uses EzXML.jl. In Python we'll likely use
     ``xml.etree.ElementTree`` or ``lxml`` later.
     """
 
@@ -74,7 +74,7 @@ class XMLElement:
 class Histogram:
     """Placeholder for a histogram type.
 
-    In Julia the project uses StatsBase.Histogram. We'll introduce a
+    In reference the project uses StatsBase.Histogram. We'll introduce a
     real histogram implementation later (or use numpy/pandas) once the
     simulation core is working.
     """

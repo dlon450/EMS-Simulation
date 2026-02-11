@@ -8,7 +8,7 @@ from .simulator import Simulation
 
 
 def test_event_ordering() -> None:
-    """Verify Julia-compatible event ordering + tie-break."""
+    """Verify reference-compatible event ordering + tie-break."""
 
     sim = Simulation()
 

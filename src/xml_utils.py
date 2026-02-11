@@ -49,7 +49,7 @@ _BOOL_MAP = {"true": True, "false": False}
 
 
 def _normalise_value_expr(text: str) -> str:
-    """Convert a small subset of Julia-ish literals to Python literals."""
+    """Convert a small subset of source-style literals to Python literals."""
     s = text.strip()
     # booleans
     s = re.sub(r"\btrue\b", "True", s, flags=re.IGNORECASE)
@@ -113,7 +113,7 @@ def interpolate_string(text: str, variables: Optional[Dict[str, str]] = None) ->
     if variables:
         mapping.update({k: str(v) for k, v in variables.items()})
 
-    # Strip wrapping quotes if present (common in configs copied from Julia)
+    # Strip wrapping quotes if present (common in configs copied from reference)
     s = (text or "").strip().strip('"')
     return string.Template(s).safe_substitute(mapping)
 

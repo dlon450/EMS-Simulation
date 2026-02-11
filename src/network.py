@@ -28,8 +28,8 @@ class Graph:
         """Append a node and return its index.
 
         The port uses **1-based indexing** (index 0 is a dummy element) to
-        mirror the Julia implementation and avoid off-by-one errors when
-        comparing against Julia outputs.
+        mirror the reference implementation and avoid off-by-one errors when
+        comparing against reference outputs.
         """
 
         if not self.nodes:
@@ -83,10 +83,10 @@ class Graph:
     def build_adjacency(self) -> None:
         """(Re)build adjacency lists from the current node/arc arrays.
 
-        When reading from Julia-style tables, nodes and arcs are populated as
+        When reading from reference-style tables, nodes and arcs are populated as
         **1-based** arrays (index 0 is a dummy element). This helper builds
         ``fadj_list``, ``badj_list``, ``out_arcs`` and ``node_pair_arc_index``
-        to enable shortest-path calculations without depending on Julia's
+        to enable shortest-path calculations without depending on reference's
         precomputed reduced network.
         """
 
@@ -217,7 +217,7 @@ class Travel:
     def mode_index_for_priority(self, priority: Priority, t: float) -> int:
         """Return the travel-mode index to use for a given priority at time ``t``.
 
-        This mirrors Julia's ``getTravelMode!(travel, priority, time)`` selection:
+        This mirrors reference's ``getTravelMode!(travel, priority, time)`` selection:
         pick the active travel set at ``t`` and then use the per-priority lookup.
         """
 

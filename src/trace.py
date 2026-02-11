@@ -9,7 +9,7 @@ import struct
 from .events import Event
 
 
-# We use Julia-style sentinel values in the trace (nullIndex=-1, nullTime=-1.0)
+# We use reference-style sentinel values in the trace (nullIndex=-1, nullTime=-1.0)
 _NULL_INDEX = -1
 _NULL_TIME = -1.0
 

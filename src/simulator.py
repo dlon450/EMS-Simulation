@@ -41,14 +41,14 @@ class Simulation:
     rng_seed: Optional[int] = None
     rng: random.Random = field(default_factory=random.Random, repr=False)
 
-    # cached counts (Julia stores these for convenience/performance)
+    # cached counts (reference stores these for convenience/performance)
     num_ambs: int = 0
     num_calls: int = 0
     num_hospitals: int = 0
     num_stations: int = 0
 
     # arc travel times read from the arcs file; indexed as [mode_index][arc_index]
-    # with a dummy element at index 0 so indices match the 1-based Julia input.
+    # with a dummy element at index 0 so indices match the 1-based reference input.
     arc_travel_times: Optional[List[List[float]]] = None
 
     # Runtime shortest-path engine (Step 5). This is populated by init_sim
@@ -184,7 +184,7 @@ class Simulation:
         return self.sp_cache.shortest_path_arcs(mode_index, start_node, end_node, self.arc_travel_times[mode_index])
 
     # ------------------------------------------------------------------
-    # Event list management (Julia-compatible ordering / tie-breaking)
+    # Event list management (reference-compatible ordering / tie-breaking)
     # ------------------------------------------------------------------
 
     def add_event(
@@ -200,7 +200,7 @@ class Simulation:
     ) -> Event:
         """Insert a new event into the future-event list.
 
-        Ordering/tie-breaking mirrors Julia's ``addEvent!``:
+        Ordering/tie-breaking mirrors reference's ``addEvent!``:
 
         * ``event_list`` is kept sorted by **non-increasing** time.
         * The next event to execute is popped from the *end*.
@@ -241,7 +241,7 @@ class Simulation:
             if e is event:
                 self.event_list.pop(i)
                 return
-        # If it is already gone, silently ignore (Julia would error; this is practical for Python).
+        # If it is already gone, silently ignore (reference would error; this is practical for Python).
 
     def next_event(self) -> Optional[Event]:
         """Pop and return the next event (earliest time)."""
@@ -329,7 +329,7 @@ class Simulation:
         return self.complete
 
     def simulate_next_event(self) -> None:
-        """Execute the next event (Julia ``simulateNextEvent!``)."""
+        """Execute the next event (reference ``simulateNextEvent!``)."""
 
         ev = self.next_event()
         if ev is None:
@@ -473,7 +473,7 @@ class Simulation:
     def _sample_mobilisation_delay(self) -> float:
         """Sample the *actual* mobilisation delay.
 
-        Julia schedules the mobilisation completion event using a random draw
+        reference schedules the mobilisation completion event using a random draw
         from ``sim.mobilisationDelay.distrRng``. Dispatch *selection* uses the
         expected duration, but the realised mobilisation time uses sampling.
         """

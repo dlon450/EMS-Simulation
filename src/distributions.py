@@ -12,7 +12,7 @@ _CALL_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$")
 
 
 def _split_top_level_args(s: str) -> List[str]:
-    """Split a Julia-style argument list by commas at top level."""
+    """Split a reference-style argument list by commas at top level."""
 
     args: List[str] = []
     depth = 0
@@ -45,7 +45,7 @@ def _eval_number_expr(expr: str) -> float:
     if expr == "":
         raise ValueError("Empty numeric expression")
 
-    # Map Julia identifiers.
+    # Map reference identifiers.
     name_map = {
         "Inf": float("inf"),
         "NaN": float("nan"),
@@ -118,7 +118,7 @@ class ParsedDistribution:
             (theta,) = p
             if theta <= 0:
                 return 0.0
-            # Python uses rate λ; Julia Exponential(θ) uses scale/mean θ.
+            # Python uses rate λ; reference Exponential(θ) uses scale/mean θ.
             return float(rng.expovariate(1.0 / theta))
 
         if n == "Gamma":
@@ -181,7 +181,7 @@ def parse_distribution_spec(spec: Any) -> ParsedDistribution:
 
     * If *spec* is None/empty -> Constant(0)
     * If *spec* is numeric -> Constant(spec)
-    * If *spec* is a string -> parse supported Julia expressions
+    * If *spec* is a string -> parse supported reference expressions
     """
 
     if spec is None:

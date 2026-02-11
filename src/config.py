@@ -35,7 +35,7 @@ def _event_form_from_token(token: str) -> EventForm:
     t = token.strip()
     if t.startswith("EventForm."):
         t = t.split(".", 1)[1]
-    # allow common Julia-ish camelCase names by converting to upper snake
+    # allow common source-style camelCase names by converting to upper snake
     # e.g. ambGoesToSleep -> AMB_GOES_TO_SLEEP
     if t and any(c.islower() for c in t) and "_" not in t:
         out = []
@@ -72,7 +72,7 @@ def load_sim_config(
     allow_write_output: bool = False,
     compute_checksums: bool = True,
 ) -> SimConfig:
-    """Load and parse a Julia-style ``simConfig`` XML file.
+    """Load and parse a reference-style ``simConfig`` XML file.
 
     This function only parses the configuration and resolves paths; it does
     *not* read the underlying simulation data tables.

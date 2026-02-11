@@ -21,7 +21,7 @@ _FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$")
 def _parse_cell(text: str) -> Any:
     """Parse a single delimited cell.
 
-    The Julia reader (readdlm) returns a matrix of ``Any`` and will
+    The reference reader (readdlm) returns a matrix of ``Any`` and will
     attempt to parse numeric values. We mimic that behavior with a small
     set of conversions:
 
@@ -67,7 +67,7 @@ def _parse_cell(text: str) -> Any:
 class Table:
     """A rectangular table with named columns.
 
-    This mirrors the Julia ``Table`` struct in ``file_io.jl``.
+    This mirrors the reference ``Table`` struct in ``file_io.jl``.
     """
 
     name: str
@@ -208,7 +208,7 @@ def write_tables_to_file(
     write_num_rows: bool = False,
     write_num_cols: bool = False,
 ) -> None:
-    """Write one or more tables to a file in the Julia-compatible format."""
+    """Write one or more tables to a file in the reference-compatible format."""
 
     # Normalize input
     if isinstance(tables, Table):
@@ -239,7 +239,7 @@ def _write_single_table(
     write_num_rows: bool,
     write_num_cols: bool,
 ) -> None:
-    # Table header line with trailing delimiter (matches Julia writeDlmLine!)
+    # Table header line with trailing delimiter (matches reference writeDlmLine!)
     parts = [
         table.name,
         str(table.num_rows) if write_num_rows else "",
@@ -261,7 +261,7 @@ def _write_single_table(
     for row in table.data:
         writer.writerow(["" if v is None else v for v in row])
 
-    # Separator blank line (Julia writes "" plus delimiter + newline)
+    # Separator blank line (reference writes "" plus delimiter + newline)
     f.write(delim + newline)
 
 
@@ -278,7 +278,7 @@ def table_rows_field_dicts(table: Table, field_names: Sequence[str]) -> List[Dic
 def parse_attributes_column(table: Table) -> List[Dict[str, Any]]:
     """Parse a JSON "attributes" column if present.
 
-    The Julia implementation treats missing/empty attributes as an empty
+    The reference implementation treats missing/empty attributes as an empty
     dict.
     """
 
