@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Iterable
-from defs import AmbStatus, Priority
-from misc import Histogram
+from typing import Dict, Iterable, List, Optional, Tuple
+
+from .defs import AmbStatus, Priority
+from .misc import Histogram
 import math
 
 

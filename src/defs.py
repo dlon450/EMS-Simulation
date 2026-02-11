@@ -1,9 +1,16 @@
+from __future__ import annotations
+
 from enum import Enum, auto
 from typing import Dict, Set, Tuple
 
 
 class Priority(Enum):
-    """Call or demand priority."""
+    """Call or demand priority.
+
+    Julia models priorities as small 1-based integers.  We keep :class:`Enum`
+    values with the same property (``.value`` is 1..N) so they can index
+    1-based tables read from the original input files.
+    """
 
     HIGH = auto()
     MED = auto()
@@ -36,7 +43,11 @@ class EventForm(Enum):
     AMB_BECOMES_FREE = auto()
     AMB_RETURNS_TO_STATION = auto()
     AMB_REACHES_STATION = auto()
+
+    # Move-up is present in the Julia codebase but intentionally skipped in this port for now.
     CONSIDER_MOVE_UP = auto()
+
+    # Cross-street / tour-window events (FDNY fork behaviour).
     AMB_RETURNS_TO_CROSS_STREET = auto()
     AMB_REACHES_CROSS_STREET = auto()
     AMB_BECOMES_INACTIVE = auto()
@@ -72,36 +83,63 @@ class AmbStatusSet(Enum):
     GOING_TO_STATION = auto()
 
 
-AMB_STATUS_SETS: Dict[AmbStatusSet, Set[AmbStatus]] = {
-    AmbStatusSet.WORKING: {
+def is_busy(status: AmbStatus) -> bool:
+    return status in {
+        AmbStatus.MOBILISING,
         AmbStatus.GOING_TO_CALL,
         AmbStatus.AT_CALL,
         AmbStatus.GOING_TO_HOSPITAL,
         AmbStatus.AT_HOSPITAL,
-        AmbStatus.FREE_AFTER_CALL,
-    },
-    AmbStatusSet.BUSY: {
-        AmbStatus.GOING_TO_CALL,
-        AmbStatus.AT_CALL,
-        AmbStatus.GOING_TO_HOSPITAL,
-        AmbStatus.AT_HOSPITAL,
-    },
-    AmbStatusSet.FREE: {
+    }
+
+
+def is_free(status: AmbStatus) -> bool:
+    # Mirrors Julia's `isFree` which intentionally includes "going to station"
+    # states: dispatch can interrupt those routes.
+    return status in {
         AmbStatus.IDLE_AT_STATION,
         AmbStatus.IDLE_AT_CROSS_STREET,
         AmbStatus.FREE_AFTER_CALL,
-    },
-    AmbStatusSet.TRAVELLING: {
-        AmbStatus.GOING_TO_CALL,
-        AmbStatus.GOING_TO_HOSPITAL,
-        AmbStatus.RETURNING_TO_STATION,
-        AmbStatus.RETURNING_TO_CROSS_STREET,
-    },
-    AmbStatusSet.GOING_TO_STATION: {
         AmbStatus.RETURNING_TO_STATION,
         AmbStatus.MOVING_UP_TO_STATION,
-    },
+        AmbStatus.RETURNING_TO_CROSS_STREET,
+    }
+
+
+def is_working(status: AmbStatus) -> bool:
+    # Julia: `!in(s, (ambNullStatus, ambSleeping))`
+    return status not in {AmbStatus.NULL, AmbStatus.SLEEPING}
+
+
+def is_going_to_station(status: AmbStatus) -> bool:
+    # Julia's definition includes RETURNING_TO_CROSS_STREET in the "going-to-station"
+    # family so that an in-progress return can be cancelled by dispatch.
+    return status in {
+        AmbStatus.RETURNING_TO_STATION,
+        AmbStatus.MOVING_UP_TO_STATION,
+        AmbStatus.RETURNING_TO_CROSS_STREET,
+    }
+
+
+def is_travelling(status: AmbStatus) -> bool:
+    return status in {AmbStatus.GOING_TO_CALL, AmbStatus.GOING_TO_HOSPITAL} or is_going_to_station(
+        status
+    )
+
+
+AMB_STATUS_SETS: Dict[AmbStatusSet, Set[AmbStatus]] = {
+    AmbStatusSet.WORKING: {s for s in AmbStatus if is_working(s)},
+    AmbStatusSet.BUSY: {s for s in AmbStatus if is_busy(s)},
+    AmbStatusSet.FREE: {s for s in AmbStatus if is_free(s)},
+    AmbStatusSet.TRAVELLING: {s for s in AmbStatus if is_travelling(s)},
+    AmbStatusSet.GOING_TO_STATION: {s for s in AmbStatus if is_going_to_station(s)},
 }
+
+# Reverse mapping: status -> sets containing it.
+AMB_STATUS_TO_SETS: Dict[AmbStatus, Set[AmbStatusSet]] = {s: set() for s in AmbStatus}
+for _set, members in AMB_STATUS_SETS.items():
+    for _status in members:
+        AMB_STATUS_TO_SETS[_status].add(_set)
 
 
 class CallStatus(Enum):

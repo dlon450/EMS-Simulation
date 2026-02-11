@@ -1,22 +1,91 @@
+"""Miscellaneous small types and placeholders.
+
+At this stage of the port, this module mainly provides small container
+types (e.g. :class:`File`) and placeholders for concepts that will be
+implemented later (e.g. histogram support, XML elements, distribution
+wrappers).
+"""
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from defs import Event, EventForm, Priority, PRIORITIES
+
+import random
+
 import io as io_
+
+from .defs import EventForm, Priority, PRIORITIES
+from .events import Event
+from .distributions import ParsedDistribution, parse_distribution_spec
 
 
 @dataclass
 class DistrRng:
-    pass
+    """Distribution + RNG wrapper (Julia-compatible intent).
+
+    Julia uses ``DistrRng`` to bundle a distribution object with a seeded
+    ``MersenneTwister`` so that sampling is deterministic and isolated.
+
+    In this Python port, input files store the distribution as a string
+    expression (e.g. ``"Exponential(0.5)"``). We parse a safe subset of
+    those expressions (see :mod:`jemss.distributions`) and sample using an
+    independent :class:`random.Random` instance.
+
+    Notes
+    -----
+    * If ``seed`` is ``None`` or negative, a random 32-bit seed is chosen.
+    * ``distribution`` may be ``None`` -> treated as ``Constant(0)``.
+    """
+
+    distribution: Any = None  # string spec or numeric constant
+    seed: Optional[int] = None
+    # Optional RNG used to generate a seed when ``seed`` is negative.
+    # This is useful for end-to-end determinism when the overall simulation
+    # is seeded.
+    seed_rng: Optional[random.Random] = None
+
+    # internal state
+    _rng: random.Random = field(init=False, repr=False)
+    _parsed: ParsedDistribution = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        seed = self.seed
+        if seed is None:
+            seed = -1
+        if seed < 0:
+            src = self.seed_rng
+            # Both ``random.Random`` and the ``random`` module provide
+            # ``getrandbits``.
+            if src is None:
+                seed = random.getrandbits(32)
+            else:
+                seed = int(src.getrandbits(32))
+        self._rng = random.Random(int(seed))
+        self._parsed = parse_distribution_spec(self.distribution)
+
+    def sample(self) -> float:
+        """Draw one sample."""
+        return float(self._parsed.sample(self._rng))
+
+    def mean(self) -> Optional[float]:
+        """Return the mean if available for the parsed distribution."""
+        return self._parsed.mean()
 
 
-@dataclass
 class XMLElement:
-    pass
+    """Placeholder for an XML element object.
+
+    The Julia implementation uses EzXML.jl. In Python we'll likely use
+    ``xml.etree.ElementTree`` or ``lxml`` later.
+    """
 
 
-@dataclass
 class Histogram:
-    pass
+    """Placeholder for a histogram type.
+
+    In Julia the project uses StatsBase.Histogram. We'll introduce a
+    real histogram implementation later (or use numpy/pandas) once the
+    simulation core is working.
+    """
 
 
 @dataclass
@@ -78,6 +147,5 @@ class Redispatch:
         return self.conditions.get(from_priority, {}).get(to_priority, False)
 
 
-Histogram = Any
 Distribution = Any
 Sampleable = Any

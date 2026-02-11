@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Tuple, Any
-from geo import Node, Arc
+from typing import Any, Dict, List, Optional, Tuple
+
+import math
+
+from .defs import Priority
+from .geo import Arc, Node
 
 
 @dataclass
@@ -15,31 +21,106 @@ class Graph:
     # mapping (from_node, to_node) -> arc_index
     node_pair_arc_index: Dict[Tuple[int, int], int] = field(default_factory=dict)
 
+    # outgoing arcs per node (index 0 unused for 1-based graphs)
+    out_arcs: List[List[int]] = field(default_factory=list)
+
     def add_node(self, node: Node) -> int:
-        """Append a node and return its index."""
+        """Append a node and return its index.
+
+        The port uses **1-based indexing** (index 0 is a dummy element) to
+        mirror the Julia implementation and avoid off-by-one errors when
+        comparing against Julia outputs.
+        """
+
+        if not self.nodes:
+            # Ensure a dummy element at index 0.
+            self.nodes.append(Node(index=0))
         node.index = len(self.nodes)
         self.nodes.append(node)
-        if len(self.fadj_list) <= node.index:
+        # Ensure adjacency structures are long enough.
+        while len(self.fadj_list) <= node.index:
             self.fadj_list.append([])
             self.badj_list.append([])
-        return node.index
+        while len(self.out_arcs) <= node.index:
+            self.out_arcs.append([])
+        return int(node.index)
 
     def add_arc(self, arc: Arc) -> int:
-        """Append an arc and update adjacency lists."""
+        """Append an arc and update adjacency lists.
+
+        Like :meth:`add_node`, this method assumes 1-based indexing with a
+        dummy element at index 0.
+        """
+
+        if not self.arcs:
+            # Ensure a dummy element at index 0.
+            self.arcs.append(Arc(index=0))
+            self.arc_dists.append(0.0)
         arc.index = len(self.arcs)
         self.arcs.append(arc)
-        self.arc_dists.append(arc.distance or 0.0)
-        if arc.from_node_index is not None and arc.to_node_index is not None:
-            while len(self.fadj_list) <= arc.from_node_index:
-                self.fadj_list.append([])
-                self.badj_list.append([])
-            while len(self.badj_list) <= arc.to_node_index:
-                self.fadj_list.append([])
-                self.badj_list.append([])
-            self.fadj_list[arc.from_node_index].append(arc.to_node_index)
-            self.badj_list[arc.to_node_index].append(arc.from_node_index)
-            self.node_pair_arc_index[(arc.from_node_index, arc.to_node_index)] = arc.index
-        return arc.index
+        dist = arc.distance
+        self.arc_dists.append(float(dist) if dist is not None else math.nan)
+
+        if arc.from_node_index is None or arc.to_node_index is None:
+            return int(arc.index)
+
+        u = int(arc.from_node_index)
+        v = int(arc.to_node_index)
+
+        # Ensure adjacency structures are long enough.
+        while len(self.fadj_list) <= max(u, v):
+            self.fadj_list.append([])
+            self.badj_list.append([])
+        while len(self.out_arcs) <= u:
+            self.out_arcs.append([])
+
+        self.fadj_list[u].append(v)
+        self.badj_list[v].append(u)
+        self.out_arcs[u].append(int(arc.index))
+        self.node_pair_arc_index[(u, v)] = int(arc.index)
+        return int(arc.index)
+
+    def build_adjacency(self) -> None:
+        """(Re)build adjacency lists from the current node/arc arrays.
+
+        When reading from Julia-style tables, nodes and arcs are populated as
+        **1-based** arrays (index 0 is a dummy element). This helper builds
+        ``fadj_list``, ``badj_list``, ``out_arcs`` and ``node_pair_arc_index``
+        to enable shortest-path calculations without depending on Julia's
+        precomputed reduced network.
+        """
+
+        if not self.nodes or self.nodes[0].index != 0:
+            raise ValueError("Graph.nodes must be 1-based with a dummy element at index 0")
+        if not self.arcs or self.arcs[0].index != 0:
+            raise ValueError("Graph.arcs must be 1-based with a dummy element at index 0")
+
+        n = len(self.nodes) - 1
+        m = len(self.arcs) - 1
+
+        self.fadj_list = [[] for _ in range(n + 1)]
+        self.badj_list = [[] for _ in range(n + 1)]
+        self.out_arcs = [[] for _ in range(n + 1)]
+        self.node_pair_arc_index = {}
+
+        # Keep a 1-based arc distance array.
+        self.arc_dists = [0.0] * (m + 1)
+        for i in range(1, m + 1):
+            a = self.arcs[i]
+            dist = a.distance
+            self.arc_dists[i] = float(dist) if dist is not None else math.nan
+
+            if a.from_node_index is None or a.to_node_index is None:
+                continue
+            u = int(a.from_node_index)
+            v = int(a.to_node_index)
+            if not (1 <= u <= n and 1 <= v <= n):
+                raise ValueError(f"Arc {i} references invalid nodes: from={u}, to={v}, n={n}")
+
+            self.fadj_list[u].append(v)
+            self.badj_list[v].append(u)
+            self.out_arcs[u].append(i)
+            self.node_pair_arc_index[(u, v)] = i
 
 
 @dataclass
@@ -132,3 +213,36 @@ class Travel:
         if idx < len(self.sets_time_order):
             return self.sets_time_order[idx]
         return None
+
+    def mode_index_for_priority(self, priority: Priority, t: float) -> int:
+        """Return the travel-mode index to use for a given priority at time ``t``.
+
+        This mirrors Julia's ``getTravelMode!(travel, priority, time)`` selection:
+        pick the active travel set at ``t`` and then use the per-priority lookup.
+        """
+
+        set_idx = self.current_set_index(t)
+        if set_idx is None:
+            raise ValueError("Travel.sets_start_times is empty; cannot select a travel set")
+        if not (1 <= set_idx < len(self.mode_lookup)):
+            raise ValueError(f"Invalid travel set index {set_idx}")
+
+        pr_idx = int(priority.value)
+        if pr_idx <= 0:
+            raise ValueError(f"Invalid priority index {pr_idx} for {priority}")
+        try:
+            mode_idx = int(self.mode_lookup[set_idx][pr_idx])
+        except Exception as e:  # IndexError or type errors
+            raise ValueError(f"travel.mode_lookup is not populated for set={set_idx}, priority={priority}") from e
+
+        if mode_idx <= 0 or mode_idx >= len(self.modes):
+            raise ValueError(
+                f"Invalid travel mode index {mode_idx} for set={set_idx}, priority={priority}; "
+                f"expected 1..{len(self.modes)-1}"
+            )
+        return mode_idx
+
+    def mode_for_priority(self, priority: Priority, t: float) -> TravelMode:
+        """Return the :class:`~jemss.network.TravelMode` for a given priority and time."""
+
+        return self.modes[self.mode_index_for_priority(priority, t)]

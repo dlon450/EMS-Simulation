@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
-from defs import Priority, TravelMode
-from geo import Point
-from map import Raster
+from typing import Dict, List, Optional
+
+from .defs import Priority
+from .geo import Point
+from .map import Raster
+from .network import TravelMode
 
 
 @dataclass
