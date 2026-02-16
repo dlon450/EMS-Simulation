@@ -1,0 +1,17 @@
+demandRasters,,,,
+rasterIndex,rasterFilename,,,
+1,EMS_Atom_Incident_CountsBX.tif,,,
+,,,,
+demandModes,,,,
+modeIndex,rasterIndex,priority,arrivalRate,note
+1,1,HIGH,528.6," =1391 x 38%"
+2,1,MED,681.6," =1391 x 49%"
+3,1,LOW,180.8," =1391 x 13%"
+,,,,
+demandSets,,,,
+setIndex,modeIndices,,,
+1,"[1,2,3]",,,
+,,,,
+demandSetsTiming,,,,
+startTime,setIndex,,,
+0,1,,,

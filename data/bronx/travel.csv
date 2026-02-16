@@ -1,0 +1,14 @@
+travelModes,,
+travelModeIndex,offRoadSpeed,note
+1,168,"lights and sirens, = 7*24"
+2,120,"regular, = 5*24"
+,,
+travelSets,,
+travelSetIndex,priority,travelModeIndex
+1,highPriority,1
+1,medPriority,1
+1,lowPriority,2
+,,
+travelSetsTiming,,
+startTime,travelSetIndex,
+0,1,
