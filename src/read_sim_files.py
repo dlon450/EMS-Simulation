@@ -952,7 +952,7 @@ def read_demand_file(path: str) -> Demand:
         dm.index = i + 1  # keep 1-based indices if your data files are 1-based
 
         raster_index = int(cols["rasterIndex"][i])
-        dm.raster_index = raster_index
+        dm.raster_index = raster_index - 1
         if not (1 <= raster_index <= demand.num_rasters):
             raise AssertionError(f"rasterIndex out of range: {raster_index}")
 
@@ -1002,7 +1002,6 @@ def read_demand_file(path: str) -> Demand:
 
     for i in range(n):
         set_index = int(cols["setIndex"][i])
-        # Julia asserts setIndex == i (1-based)
         if set_index != i + 1:
             raise AssertionError(f"demandSets.setIndex must be 1..n in order; got {set_index} at row {i}")
 
@@ -1030,6 +1029,8 @@ def read_demand_file(path: str) -> Demand:
             if demand.mode_lookup[set_index - 1][pr_col] != NULL_INDEX:
                 raise AssertionError("demand.mode_lookup entry already filled")
             demand.mode_lookup[set_index - 1][pr_col] = mode_index
+        print('demand set index', set_index, demand.mode_lookup[set_index - 1])
+
 
     # check fully filled
     if any(v == NULL_INDEX for row in demand.mode_lookup for v in row):

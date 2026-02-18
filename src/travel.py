@@ -42,11 +42,9 @@ def get_travel_mode(
     travel_set_index = travel.sets_time_order[i]
 
     pr_idx = int(priority.value)
-    pr_col = pr_idx - 1 if pr_idx >= 1 else pr_idx
 
-    travel_mode_index = travel.mode_lookup[travel_set_index][pr_col]
-
-    return travel.modes[travel_mode_index]
+    travel_mode_index = travel.mode_lookup[travel_set_index][pr_idx]
+    return travel.modes[travel_mode_index - 1]
 
 
 # -------------------------------------------------

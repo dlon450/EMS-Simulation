@@ -53,7 +53,7 @@ def get_demand_mode(demand: Demand, priority: Priority, start_time: float) -> De
     if idx_in_time_order < 0 or idx_in_time_order >= len(demand.sets_time_order):
         raise AssertionError("recent_sets_start_times_index invalid for sets_time_order")
 
-    demand_set_index = demand.sets_time_order[idx_in_time_order]
+    demand_set_index = demand.sets_time_order[idx_in_time_order] - 1
 
     pr_idx = int(priority.value)  # adapt if needed
     if 1 <= pr_idx <= len(PRIORITIES):
@@ -61,9 +61,8 @@ def get_demand_mode(demand: Demand, priority: Priority, start_time: float) -> De
     else:
         pr_col = pr_idx
 
-    print('demand set index', demand_set_index)
     demand_mode_index = demand.mode_lookup[demand_set_index][pr_col]
-    return demand.modes[demand_mode_index]
+    return demand.modes[demand_mode_index - 1]
 
 
 def create_demand_points_from_rasters(
@@ -199,7 +198,7 @@ def create_points_coverage_mode(sim: Simulation, travel_mode: TravelMode, cover_
 
 
 def get_points_coverage_mode(demand_coverage: DemandCoverage, travel_mode: TravelMode, cover_time: float) -> PointsCoverageMode:
-    tmi = int(travel_mode.index)
+    tmi = int(travel_mode.index) - 1
     if tmi not in demand_coverage.points_coverage_mode_lookup:
         raise AssertionError("travel_mode.index not in points_coverage_mode_lookup")
     if cover_time not in demand_coverage.points_coverage_mode_lookup[tmi]:
@@ -216,7 +215,9 @@ def get_points_coverage_mode_mut(sim: Simulation, demand_priority: Priority, cur
         raise AssertionError("current_time cannot be None")
 
     travel_priority = sim.response_travel_priorities[demand_priority]
+
     travel_mode = get_travel_mode(sim.travel, travel_priority, current_time)
+
     cover_time = sim.demand_coverage.cover_times[demand_priority]
     pcm = get_points_coverage_mode(sim.demand_coverage, travel_mode, cover_time)
     if pcm is None:
@@ -279,19 +280,19 @@ def init_points_coverage_modes(sim: Simulation) -> None:
         for demand_priority in PRIORITIES:
             travel_priority = sim.response_travel_priorities[demand_priority]
 
-            tp_idx = int(travel_priority.value)
-            tp_col = tp_idx - 1 if tp_idx >= 1 else tp_idx
+            tp_col = int(travel_priority.value)
 
-            travel_mode_index = travel.mode_lookup[set_i][tp_col]
-            travel_mode = travel.modes[travel_mode_index]
+            travel_mode_index = travel.mode_lookup[set_i + 1][tp_col]
+            travel_mode = travel.modes[travel_mode_index - 1]
             cover_time = dc.cover_times[demand_priority]
 
-            tmi = int(travel_mode.index)
+            tmi = int(travel_mode.index) - 1
             if cover_time not in dc.points_coverage_mode_lookup[tmi]:
                 pcm = create_points_coverage_mode(sim, travel_mode, cover_time)
                 pcm.index = len(dc.points_coverage_modes)
                 dc.points_coverage_modes.append(pcm)
                 dc.points_coverage_mode_lookup[tmi][cover_time] = pcm.index
+
 
 
 def init_demand_coverage(
@@ -366,7 +367,6 @@ def init_demand_coverage(
 
     for t in times:
         for demand_priority in PRIORITIES:
-            print('test', t, demand_priority)
             pcm = get_points_coverage_mode_mut(sim, demand_priority, t)
             dm = get_demand_mode(demand, demand_priority, t)
             raster_index = dm.raster_index
