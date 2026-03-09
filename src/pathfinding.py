@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Tuple
 
 import heapq
 import math
+import os
 from collections import OrderedDict
 
 from .network import Graph
@@ -161,11 +162,9 @@ class ShortestPathCache:
         """Return the shortest path as a list of node indices."""
         arcs = self.shortest_path_arcs(mode_index, source, target, arc_times)
         nodes: List[int] = [source]
-        u = source
         for a in arcs:
             v = self.arc_to[a]
             nodes.append(v)
-            u = v
         return nodes
 
     # ------------------------------------------------------------------
@@ -203,3 +202,17 @@ class ShortestPathCache:
                     heapq.heappush(heap, (nd, v))
 
         return dist, prev_arc
+
+
+# Prefer the compiled Cython backend when it is available.
+# Keep the pure-Python implementation above as a transparent fallback.
+PATHFINDING_BACKEND = "python"
+if os.environ.get("EMS_PATHFINDING_BACKEND", "").strip().lower() != "python":
+    try:  # pragma: no cover - exercised only in compiled environments
+        from .pathfinding_cy import ShortestPathCache as _CythonShortestPathCache
+
+        ShortestPathCache = _CythonShortestPathCache  # type: ignore[misc,assignment]
+        PATHFINDING_BACKEND = "cython"
+    except Exception:
+        # Compilation is optional; fallback remains fully functional.
+        pass

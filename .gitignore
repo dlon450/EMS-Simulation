@@ -212,3 +212,6 @@ __marimo__/
 old/
 output/
 data/
+profiling/*.prof
+# Cython build artifact for optional pathfinding extension
+src/pathfinding_cy.c
