@@ -7,8 +7,9 @@
     <ambulances>ambulances.csv</ambulances>
     <hospitals>hospitals.csv</hospitals>
     <stations>stations.csv</stations>
-    <calls>calls.csv</calls>
+    <calls>calls_new.csv</calls>
     <arcs>arcs.csv</arcs>
+    <demandCoverage>demandcoverage.csv</demandCoverage>
     <nodes>nodes.csv</nodes>
     <map>map.csv</map>
     <priorities>priorities.csv</priorities>

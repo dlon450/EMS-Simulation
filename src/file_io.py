@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, TextIO
 
+from string import Template
+
 import csv
 import json
 import math
@@ -295,3 +297,22 @@ def parse_attributes_column(table: Table) -> List[Dict[str, Any]]:
                 cell = str(cell)
             attrs.append(json.loads(cell))
     return attrs
+
+
+def join_path_if_not_abs(base_path: str, path: str) -> str:
+    """
+    If `path` is absolute, return its absolute version.
+    Otherwise, join it with `base_path`.
+    """
+    if os.path.isabs(path):
+        return os.path.abspath(path)
+    return os.path.join(base_path, path)
+
+def interpolate_string(s: str, context: dict | None = None) -> str:
+    """
+    Safe string interpolation similar to Julia's string interpolation.
+    Supports $VAR syntax.
+    """
+    if context is None:
+        context = os.environ  # or a controlled config dict
+    return Template(s).safe_substitute(context)

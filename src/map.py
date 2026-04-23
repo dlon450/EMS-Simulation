@@ -303,6 +303,8 @@ def find_nearest_node(
                     nearest_in_cell: int = -1
                     best_sqr = math.inf
                     for node_index in grid.rects[i][j].node_indices:
+                        if not nodes[node_index].index:
+                            continue
                         sqr = square_dist(map_, nodes[node_index].location, location)
                         if sqr < best_sqr:
                             best_sqr = sqr

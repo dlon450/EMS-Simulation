@@ -14,6 +14,7 @@ from .read_sim_files import (
     read_ambs_file,
     read_arcs_file,
     read_calls_file,
+    read_demand_file,
     read_demand_coverage_file,
     read_hospitals_file,
     read_map_file,
@@ -273,6 +274,11 @@ def init_sim_from_config(cfg: SimConfig, *, do_print: bool = False, seed: Option
                     sim.add_event(form=EventForm.AMB_BECOMES_ACTIVE, time=t_on, ambulance=a, add_event_to_amb=False)
                 if t_off >= float(sim.start_time):
                     sim.add_event(form=EventForm.AMB_BECOMES_INACTIVE, time=t_off, ambulance=a, add_event_to_amb=False)
+
+    # TODO: check demand files
+    if "demand" in cfg.input_files:
+        sim.demand = read_demand_file(cfg.input_files["demand"].path)
+
 
     # optional inputs
     if "demandCoverage" in cfg.input_files:

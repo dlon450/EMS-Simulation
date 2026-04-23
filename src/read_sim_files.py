@@ -4,18 +4,23 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import ast
 import math
+import numpy as np
+from osgeo import gdal
+import os
 
 from .defs import AmbClass, Priority, PRIORITIES
-from .demand import DemandCoverage
+from .demand import DemandCoverage, Demand, DemandMode
 from .entities import Ambulance, Call, Hospital, Station
 from .file_io import (
     Table,
     parse_attributes_column,
     read_tables_from_file,
     table_rows_field_dicts,
+    join_path_if_not_abs,
+    interpolate_string
 )
 from .geo import Arc, Location, Node
-from .map import Map
+from .map import Map, Raster
 from .misc import DistrRng, MobilisationDelay, Redispatch
 from .network import Travel, TravelMode
 
@@ -648,7 +653,8 @@ def read_travel_file(filename: str) -> Travel:
     cols = table.columns
 
     travel.num_modes = n
-    travel.modes = [TravelMode(index=0, off_road_speed=None)]
+    travel.modes = []
+    #[TravelMode(index=0, off_road_speed=None)]
     for row_i in range(n):
         i = row_i + 1
         tm = TravelMode()
@@ -883,3 +889,291 @@ def read_stats_control_file(filename: str) -> Dict[str, Any]:
         "recordResponseDurationHist": record_hist,
         "responseDurationHistBinWidth": bin_width,
     }
+
+
+def read_demand_file(path: str) -> Demand:
+    tables = read_tables_from_file(path)
+
+    demand = Demand()
+
+    # -------------------------
+    # demand rasters
+    # -------------------------
+    table = tables["demandRasters"]
+    n = len(table.data)  # number of rows
+    demand.num_rasters = n
+    if n < 1:
+        raise AssertionError("demandRasters must have at least 1 row")
+
+    cols = table.columns
+    demand.rasters = [None] * n  # type: ignore[list-item]
+    demand.raster_filenames = [""] * n
+
+    # warn on duplicates (Julia warns but does not fail)
+    raster_fns = cols.get("rasterFilename", [])
+    if len(set(raster_fns)) != len(raster_fns):
+        # replace with your logger if desired
+        print("Warning: duplicate raster filenames in demand file (unnecessary).")
+
+    demand_file_dir = os.path.dirname(os.path.realpath(path))
+
+    for i in range(n):
+        raster_index_cell = cols["rasterIndex"][i]
+        if raster_index_cell != i + 1:
+            raise AssertionError(f"demandRasters.rasterIndex must be 1..n; got {raster_index_cell} at row {i}")
+
+        raster_filename = str(cols["rasterFilename"][i])
+        raster_filename = join_path_if_not_abs(demand_file_dir, interpolate_string(raster_filename))
+
+        if not os.path.isfile(raster_filename):
+            raise FileNotFoundError(raster_filename)
+
+        demand.raster_filenames[i] = raster_filename
+        demand.rasters[i] = read_raster_file(raster_filename)
+
+    # -------------------------
+    # demand modes
+    # -------------------------
+    table = tables["demandModes"]
+    n = len(table.data)
+    demand.num_modes = n
+    if n < 1:
+        raise AssertionError("demandModes must have at least 1 row")
+
+    cols = table.columns
+    demand.modes = [DemandMode() for _ in range(n)]
+
+    for i in range(n):
+        mode_index_cell = cols["modeIndex"][i]
+        if mode_index_cell != i + 1:
+            raise AssertionError(f"demandModes.modeIndex must be 1..n; got {mode_index_cell} at row {i}")
+
+        dm = DemandMode()
+        dm.index = i + 1  # keep 1-based indices if your data files are 1-based
+
+        raster_index = int(cols["rasterIndex"][i])
+        dm.raster_index = raster_index - 1
+        if not (1 <= raster_index <= demand.num_rasters):
+            raise AssertionError(f"rasterIndex out of range: {raster_index}")
+
+        dm.raster = demand.rasters[raster_index - 1]
+
+        # Julia: columns["priority"][i] |> Meta.parse |> eval
+        # In Python, do NOT eval. Prefer parsing a string token into a Priority.
+        dm.priority = parse_priority_token(str(cols["priority"][i]))
+
+        dm.arrival_rate = float(cols["arrivalRate"][i])
+        if dm.arrival_rate < 0:
+            raise AssertionError("arrivalRate must be >= 0")
+
+        # rasterMultiplier = arrivalRate / sum(raster.z)
+        total = float(dm.raster.z.sum()) if hasattr(dm.raster.z, "sum") else float(sum(sum(row) for row in dm.raster.z))
+        if total <= 0:
+            # Julia would divide by 0 if sum(z)==0; better to guard explicitly.
+            raise ValueError(f"Raster sum(z) must be > 0 to compute raster_multiplier (mode {dm.index})")
+        dm.raster_multiplier = dm.arrival_rate / total
+
+        demand.modes[i] = dm
+
+    # -------------------------
+    # demand sets
+    # -------------------------
+    table = tables["demandSets"]
+    n = len(table.data)
+    if n < 1:
+        raise AssertionError("demandSets must have at least 1 row")
+
+    cols = table.columns
+    # Julia: numSets = maximum(columns["setIndex"])
+    num_sets = int(max(cols["setIndex"]))
+    demand.num_sets = num_sets
+
+    # check all sets 1..num_sets appear
+    used_sets = sorted(set(int(x) for x in cols["setIndex"]))
+    if used_sets != list(range(1, num_sets + 1)):
+        raise AssertionError("All sets from 1..num_sets must be used")
+
+    num_priorities = len(PRIORITIES)
+
+    # mode_lookup[set_idx][priority_idx] -> mode index (store 1-based mode indices like Julia)
+    # Initialize with -1 (nullIndex equivalent)
+    NULL_INDEX = -1
+    demand.mode_lookup = [[NULL_INDEX for _ in range(num_priorities)] for _ in range(num_sets)]
+
+    for i in range(n):
+        set_index = int(cols["setIndex"][i])
+        if set_index != i + 1:
+            raise AssertionError(f"demandSets.setIndex must be 1..n in order; got {set_index} at row {i}")
+
+        # Julia: modeIndices parsed+eval (probably a vector literal like [1,2,3])
+        # In Python: assume parser returns either a list already, or a string like "[1,2]".
+        mode_indices_cell = cols["modeIndices"][i]
+        if isinstance(mode_indices_cell, str):
+            mode_indices = ast.literal_eval(mode_indices_cell)
+            #mode_indices = parse_int_list_literal(mode_indices_cell)  # implement safely (no eval)
+        else:
+            mode_indices = list(mode_indices_cell)
+
+        for mode_index in mode_indices:
+            mode_index = int(mode_index)
+            if not (1 <= mode_index <= demand.num_modes):
+                raise AssertionError(f"modeIndex out of range: {mode_index}")
+
+            pr = demand.modes[mode_index - 1].priority
+            # map Priority to column index 0..num_priorities-1
+            try:
+                pr_col = PRIORITIES.index(pr)
+            except ValueError as e:
+                raise AssertionError(f"Unknown priority {pr} in PRIORITIES") from e
+
+            if demand.mode_lookup[set_index - 1][pr_col] != NULL_INDEX:
+                raise AssertionError("demand.mode_lookup entry already filled")
+            demand.mode_lookup[set_index - 1][pr_col] = mode_index
+        print('demand set index', set_index, demand.mode_lookup[set_index - 1])
+
+
+    # check fully filled
+    if any(v == NULL_INDEX for row in demand.mode_lookup for v in row):
+        raise AssertionError("demand.mode_lookup not fully filled (missing some priorities in some sets)")
+
+    # -------------------------
+    # demand sets timing
+    # -------------------------
+    table = tables["demandSetsTiming"]
+    cols = table.columns
+
+    demand.sets_start_times = [float(x) for x in cols["startTime"]]
+    if not demand.sets_start_times:
+        raise AssertionError("demandSetsTiming.startTime is empty")
+
+    # Julia: first startTime > nullTime; here we just require > 0 unless you have a nullTime constant.
+    if demand.sets_start_times[0] < 0:
+        raise AssertionError("First startTime must be > nullTime (expected positive)")
+
+    # Julia: issorted(..., lt=<=) i.e., nondecreasing
+    if any(demand.sets_start_times[i] > demand.sets_start_times[i + 1] for i in range(len(demand.sets_start_times) - 1)):
+        raise AssertionError("startTime must be nondecreasing")
+
+    demand.sets_time_order = [int(x) for x in cols["setIndex"]]
+    used_time_sets = sorted(set(demand.sets_time_order))
+    if used_time_sets != list(range(1, num_sets + 1)):
+        raise AssertionError("Each demand set should be used at least once in demandSetsTiming")
+
+
+    demand.recent_sets_start_times_index = 0  
+    return demand
+
+def read_raster_file(raster_filename: str, *, agg_x: int = 100, agg_y: int = 100,
+    agg_method: str = "mean", trim: bool = True,) -> Raster:
+    """
+    Read raster (band 1) and optionally aggregate/downsample to reduce grid size.
+
+    agg_x, agg_y:
+      - aggregation factors along x and y of the returned z (shape (nx, ny))
+      - Example: agg_x=10, agg_y=10 reduces 1000x1000 -> 100x100
+
+    agg_method:
+      - 'sum' preserves total demand mass (recommended for demand rasters)
+      - 'mean' preserves average intensity per cell
+
+    trim:
+      - if True, drop remainder cells that don't fit an exact block
+      - if False, pad with zeros before aggregating
+    """
+    if not os.path.isfile(raster_filename):
+        raise FileNotFoundError(raster_filename)
+
+    ds = gdal.Open(raster_filename, gdal.GA_ReadOnly)
+    if ds is None:
+        raise RuntimeError(f"Failed to open raster: {raster_filename}")
+
+    try:
+        band = ds.GetRasterBand(1)  # first band only
+        z_raw = band.ReadAsArray()  # GDAL returns shape (rows, cols) = (ny, nx)
+        geo_transform = ds.GetGeoTransform()  # (x1, dxdi, dxdj, y1, dydi, dydj)
+    finally:
+        ds = None  # close
+
+    # Unpack geotransform
+    x1, dxdi, dxdj, y1, dydi, dydj = geo_transform
+
+    # Data checks (same as Julia)
+    if not (dxdj == 0 and dydi == 0):
+        raise AssertionError("Raster is sloping/rotated: expected dxdj==0 and dydi==0")
+    if dxdi <= 0:
+        raise AssertionError("Expected dxdi > 0")
+    if dydj == 0:
+        raise AssertionError("Expected dydj != 0")
+
+    dx = float(dxdi)       # cell width in x direction
+    dy0 = float(dydj)      # cell height in y direction (may be negative)
+
+    # Convert z to match Julia's convention z[i,j] with i over x (nx) and j over y (ny)
+    # GDAL gives z_raw[j,i] ~ (y,x) so transpose to (x,y)
+    z = np.asarray(z_raw).T  # shape becomes (nx, ny)
+
+    nx, ny = z.shape
+
+    # x centers are always increasing since dx>0
+    x_min = x1 + 0.5 * dx
+
+    # For y: if dy0 < 0, flip sign and reverse y-axis dimension (dims=2 in Julia => axis=1 in (nx,ny))
+
+
+    if dy0 > 0:
+        y_min = y1 + 0.5 * dy0
+        dy = dy0
+    else:
+        # Julia: (yMin, dy, z) = (y1 + (ny - 0.5)*dy, -dy, reverse(z, dims=2))
+        y_min = y1 + (ny - 0.5) * dy0
+        dy = -dy0
+        z = z[:, ::-1]  # reverse along y dimension
+
+
+    # --- Aggregate if requested ---
+    if agg_x != 1 or agg_y != 1:
+        # IMPORTANT: if we are aggregating with SUM, total mass preserved automatically.
+        z = _block_reduce_2d(z, fx=agg_x, fy=agg_y, method=agg_method, trim=trim)
+
+        # Update grid spacing: each new cell spans agg_x/agg_y original cells
+        dx = dx * agg_x
+        dy = dy * agg_y
+
+        nx, ny = z.shape
+
+
+    x = x_min + dx * np.arange(nx)
+    y = y_min + dy * np.arange(ny)
+
+    return Raster(x=x, y=y, z=z)
+
+
+def _block_reduce_2d(z: np.ndarray, fx: int, fy: int, method: str = "sum", trim: bool = True) -> np.ndarray:
+    """
+    Reduce z of shape (nx, ny) into (nx', ny') by aggregating blocks of (fx, fy).
+    """
+    if fx < 1 or fy < 1:
+        raise ValueError("fx and fy must be >= 1")
+    nx, ny = z.shape
+
+    if trim:
+        nx2 = (nx // fx) * fx
+        ny2 = (ny // fy) * fy
+        z = z[:nx2, :ny2]
+    else:
+        # pad with zeros to next multiple
+        nx2 = int(np.ceil(nx / fx) * fx)
+        ny2 = int(np.ceil(ny / fy) * fy)
+        pad_x = nx2 - nx
+        pad_y = ny2 - ny
+        if pad_x or pad_y:
+            z = np.pad(z, ((0, pad_x), (0, pad_y)), mode="constant", constant_values=0.0)
+
+    nx2, ny2 = z.shape
+    z4 = z.reshape(nx2 // fx, fx, ny2 // fy, fy)
+
+    if method == "sum":
+        return z4.sum(axis=(1, 3))
+    if method == "mean":
+        return z4.mean(axis=(1, 3))
+    raise ValueError("method must be 'sum' or 'mean'")

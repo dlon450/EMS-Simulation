@@ -1,13 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from .defs import Priority, PRIORITIES, AmbStatus, is_free
 from .entities import Ambulance, Call
 
 if TYPE_CHECKING:  # pragma: no cover
     from .simulator import Simulation
+
+
+DEFAULT_COVERAGE_DISPATCH_RHO = 0.5
+
+
+@dataclass(frozen=True)
+class _CoverageDispatchCandidate:
+    amb_index: int
+    response_duration: float
+    coverage_loss: float
 
 
 def _priority_rank(p: Priority) -> int:
@@ -147,5 +157,157 @@ def find_nearest_dispatchable_amb(sim: "Simulation", call: Call, *, require_reco
     return best_idx
 
 
+def _amb_contributes_to_demand_coverage(amb: Ambulance, *, num_stations: int) -> bool:
+    """Whether an ambulance should be counted in station-based demand coverage."""
+
+    if amb.station_index is None:
+        return False
+    station_idx = int(amb.station_index)
+    if station_idx <= 0 or station_idx >= num_stations:
+        return False
+    return is_free(amb.status) and not amb.end_current_tour
+
+
+def _station_demand_coverage_counts(sim: "Simulation") -> List[int]:
+    """Count currently free coverage ambulances by assigned station index."""
+
+    counts = [0] * len(sim.stations)
+    num_stations = len(sim.stations)
+    for amb in sim.ambulances[1:]:
+        if _amb_contributes_to_demand_coverage(amb, num_stations=num_stations):
+            counts[int(amb.station_index)] += 1
+    return counts
+
+
+def _demand_coverage_shortage(sim: "Simulation", stations_num_ambs: List[int]) -> float:
+    """Total current demand not covered by any available station ambulance."""
+
+    if not sim.demand_coverage.initialised:
+        raise ValueError("demand coverage must be initialised before coverage dispatch")
+
+    # Lazy import avoids a module cycle: init_dc imports simulator, which imports decision.
+    from .init_dc import get_demand_mode, get_points_coverage_mode_mut
+
+    current_time = float(sim.time or 0.0)
+    shortage = 0.0
+
+    for priority in PRIORITIES:
+        pcm = get_points_coverage_mode_mut(sim, priority, current_time)
+        demand_mode = get_demand_mode(sim.demand, priority, current_time)
+
+        if pcm.index is None:
+            raise AssertionError("PointsCoverageMode.index must be set")
+        if demand_mode.raster_index is None:
+            raise AssertionError("DemandMode.raster_index must be set")
+
+        point_set_demands = sim.demand_coverage.point_sets_demands[pcm.index][demand_mode.raster_index]
+        multiplier = float(demand_mode.raster_multiplier)
+
+        for point_set_idx, station_set in enumerate(pcm.station_sets):
+            is_covered = any(
+                0 <= station_idx < len(stations_num_ambs) and stations_num_ambs[station_idx] > 0
+                for station_idx in station_set
+            )
+            if not is_covered:
+                shortage += float(point_set_demands[point_set_idx]) * multiplier
+
+    return shortage
+
+
+def _scaled_minimize_value(value: float, min_value: float, max_value: float) -> float:
+    if max_value <= min_value:
+        return 0.0
+    return (value - min_value) / (max_value - min_value)
+
+
+def find_coverage_dispatchable_amb(
+    sim: "Simulation",
+    call: Call,
+    *,
+    require_recommended_class: bool = False,
+    rho: float = DEFAULT_COVERAGE_DISPATCH_RHO,
+) -> Optional[int]:
+    """Return the ambulance minimizing rho * response + (1-rho) * coverage loss.
+
+    Both objectives are min-max scaled over the dispatchable candidates for the
+    current call. ``rho=1`` is nearest-response only; ``rho=0`` is coverage-loss
+    only.
+    """
+
+    if not 0.0 <= rho <= 1.0:
+        raise ValueError("rho must be between 0 and 1")
+
+    candidates: List[_CoverageDispatchCandidate] = []
+    station_counts = _station_demand_coverage_counts(sim)
+    current_shortage = _demand_coverage_shortage(sim, station_counts)
+    shortage_cache: Dict[Optional[int], float] = {}
+    num_stations = len(sim.stations)
+
+    for amb in sim.ambulances[1:]:
+        if amb.index is None:
+            continue
+        if not is_amb_dispatchable(sim, amb, call):
+            continue
+
+        if require_recommended_class and call.recommended_amb_class is not None:
+            if amb.amb_class != call.recommended_amb_class:
+                continue
+
+        station_idx: Optional[int] = None
+        if _amb_contributes_to_demand_coverage(amb, num_stations=num_stations):
+            station_idx = int(amb.station_index)
+
+        if station_idx not in shortage_cache:
+            candidate_station_counts = station_counts.copy()
+            if station_idx is not None:
+                candidate_station_counts[station_idx] = max(0, candidate_station_counts[station_idx] - 1)
+            shortage_cache[station_idx] = _demand_coverage_shortage(sim, candidate_station_counts)
+
+        shortage_after_dispatch = shortage_cache[station_idx]
+        coverage_loss = max(0.0, shortage_after_dispatch - current_shortage)
+        candidates.append(
+            _CoverageDispatchCandidate(
+                amb_index=int(amb.index),
+                response_duration=_estimated_response_duration(sim, amb, call),
+                coverage_loss=coverage_loss,
+            )
+        )
+
+    if not candidates:
+        return None
+
+    min_response = min(c.response_duration for c in candidates)
+    max_response = max(c.response_duration for c in candidates)
+    min_coverage_loss = min(c.coverage_loss for c in candidates)
+    max_coverage_loss = max(c.coverage_loss for c in candidates)
+
+    best_idx: Optional[int] = None
+    best_score: Tuple[float, float, float] = (float("inf"), float("inf"), float("inf"))
+
+    for candidate in candidates:
+        scaled_response = _scaled_minimize_value(candidate.response_duration, min_response, max_response)
+        scaled_coverage_loss = _scaled_minimize_value(
+            candidate.coverage_loss,
+            min_coverage_loss,
+            max_coverage_loss,
+        )
+        objective = rho * scaled_response + (1.0 - rho) * scaled_coverage_loss
+        score = (objective, candidate.response_duration, candidate.coverage_loss)
+        if score < best_score:
+            best_score = score
+            best_idx = candidate.amb_index
+
+    return best_idx
+
+
 def find_nearest_dispatchable_amb_als_bls(sim: "Simulation", call: Call) -> Optional[int]:
     return find_nearest_dispatchable_amb(sim, call, require_recommended_class=True)
+
+
+def find_coverage_dispatchable_amb_als_bls(
+    sim: "Simulation",
+    call: Call,
+    *,
+    rho: float = DEFAULT_COVERAGE_DISPATCH_RHO,
+) -> Optional[int]:
+    return find_coverage_dispatchable_amb(sim, call, require_recommended_class=True, rho=rho)

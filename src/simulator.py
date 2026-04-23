@@ -155,6 +155,32 @@ class Simulation:
         self.trace = None
 
     # ------------------------------------------------------------------
+    # Demand helpers
+    # ------------------------------------------------------------------
+
+    def update_atom_demands(
+        self,
+        *,
+        time: Optional[float] = None,
+        demand_priorities: Optional[List[Priority]] = None,
+        set_point_values: bool = True,
+    ) -> Dict[Priority, List[float]]:
+        """Update current demand on each demand atom/point."""
+
+        from .init_dc import update_atom_demands_mut
+
+        current_time = self.time if time is None else time
+        if current_time is None:
+            raise ValueError("simulation time must be set before updating atom demands")
+
+        return update_atom_demands_mut(
+            self,
+            float(current_time),
+            demand_priorities=demand_priorities,
+            set_point_values=set_point_values,
+        )
+
+    # ------------------------------------------------------------------
     # Step 5: shortest-path helpers
     # ------------------------------------------------------------------
 
