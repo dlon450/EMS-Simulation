@@ -75,3 +75,9 @@ class DemandCoverage:
     points_coverage_mode_lookup: Dict[int, Dict[float, int]] = field(default_factory=dict)
     # [points_coverage_mode_index][raster_index] -> demand per point-set
     point_sets_demands: List[List[List[float]]] = field(default_factory=list)
+
+    # Runtime caches for empirical / blended demand estimation.
+    call_to_point_lookup: Dict[int, int] = field(default_factory=dict)
+    empirical_point_demands: Dict[Priority, List[float]] = field(default_factory=dict)
+    blended_point_demands: Dict[Priority, List[float]] = field(default_factory=dict)
+    blended_point_demands_set_time: Optional[float] = None

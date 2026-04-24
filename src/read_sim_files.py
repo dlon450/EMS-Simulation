@@ -653,8 +653,9 @@ def read_travel_file(filename: str) -> Travel:
     cols = table.columns
 
     travel.num_modes = n
-    travel.modes = []
-    #[TravelMode(index=0, off_road_speed=None)]
+    # Keep travel.modes 1-based with a dummy entry at index 0, matching the
+    # lookup tables read from the reference-style CSV files.
+    travel.modes = [TravelMode(index=0)]
     for row_i in range(n):
         i = row_i + 1
         tm = TravelMode()

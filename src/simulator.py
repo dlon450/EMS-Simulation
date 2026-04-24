@@ -87,6 +87,11 @@ class Simulation:
     response_travel_priorities: Dict[Priority, Priority] = field(default_factory=dict)
     target_response_durations: List[float] = field(default_factory=list)
 
+    use_blended_demand_estimate: bool = False
+    blended_demand_alpha: float = 0.5
+    blended_demand_lookback_duration: float = 6.0 / 24.0
+    blended_demand_update_interval: float = 6.0 / 24.0
+
     # Parameters from statsControl (if provided).
     stats_control: Dict[str, Any] = field(default_factory=dict)
 
@@ -138,6 +143,10 @@ class Simulation:
         if self.trace is not None:
             self.trace = TraceRecorder(store_events=self.trace.store_events, compute_digest=self.trace.compute_digest)
 
+        self.demand_coverage.empirical_point_demands.clear()
+        self.demand_coverage.blended_point_demands.clear()
+        self.demand_coverage.blended_point_demands_set_time = None
+
     # ------------------------------------------------------------------
     # Step 9: tracing helpers
     # ------------------------------------------------------------------
@@ -176,6 +185,70 @@ class Simulation:
         return update_atom_demands_mut(
             self,
             float(current_time),
+            demand_priorities=demand_priorities,
+            set_point_values=set_point_values,
+        )
+
+    def enable_blended_demand_estimate(
+        self,
+        *,
+        alpha: float,
+        lookback_hours: float = 6.0,
+        update_interval_hours: Optional[float] = None,
+    ) -> None:
+        """Enable blended baseline/empirical demand estimation for coverage."""
+
+        if not 0.0 <= alpha <= 1.0:
+            raise ValueError("alpha must be between 0 and 1")
+        if lookback_hours <= 0.0:
+            raise ValueError("lookback_hours must be > 0")
+        if update_interval_hours is None:
+            update_interval_hours = lookback_hours
+        if update_interval_hours <= 0.0:
+            raise ValueError("update_interval_hours must be > 0")
+
+        self.use_blended_demand_estimate = True
+        self.blended_demand_alpha = float(alpha)
+        self.blended_demand_lookback_duration = float(lookback_hours) / 24.0
+        self.blended_demand_update_interval = float(update_interval_hours) / 24.0
+
+        self.demand_coverage.empirical_point_demands.clear()
+        self.demand_coverage.blended_point_demands.clear()
+        self.demand_coverage.blended_point_demands_set_time = None
+
+    def disable_blended_demand_estimate(self) -> None:
+        self.use_blended_demand_estimate = False
+        self.demand_coverage.empirical_point_demands.clear()
+        self.demand_coverage.blended_point_demands.clear()
+        self.demand_coverage.blended_point_demands_set_time = None
+
+    def update_blended_demand_estimate(
+        self,
+        *,
+        time: Optional[float] = None,
+        alpha: Optional[float] = None,
+        lookback_duration: Optional[float] = None,
+        demand_priorities: Optional[List[Priority]] = None,
+        set_point_values: bool = True,
+    ) -> Dict[Priority, List[float]]:
+        """Refresh the blended empirical/baseline atom-demand estimate."""
+
+        from .init_dc import update_blended_demand_estimate_mut
+
+        current_time = self.time if time is None else time
+        if current_time is None:
+            raise ValueError("simulation time must be set before updating blended demand")
+
+        if alpha is None:
+            alpha = self.blended_demand_alpha
+        if lookback_duration is None:
+            lookback_duration = self.blended_demand_lookback_duration
+
+        return update_blended_demand_estimate_mut(
+            self,
+            float(current_time),
+            alpha=float(alpha),
+            lookback_duration=float(lookback_duration),
             demand_priorities=demand_priorities,
             set_point_values=set_point_values,
         )

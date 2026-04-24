@@ -186,22 +186,21 @@ def _demand_coverage_shortage(sim: "Simulation", stations_num_ambs: List[int]) -
         raise ValueError("demand coverage must be initialised before coverage dispatch")
 
     # Lazy import avoids a module cycle: init_dc imports simulator, which imports decision.
-    from .init_dc import get_demand_mode, get_points_coverage_mode_mut
+    from .init_dc import get_effective_point_sets_demands_mut, get_points_coverage_mode_mut
 
     current_time = float(sim.time or 0.0)
     shortage = 0.0
 
     for priority in PRIORITIES:
         pcm = get_points_coverage_mode_mut(sim, priority, current_time)
-        demand_mode = get_demand_mode(sim.demand, priority, current_time)
-
         if pcm.index is None:
             raise AssertionError("PointsCoverageMode.index must be set")
-        if demand_mode.raster_index is None:
-            raise AssertionError("DemandMode.raster_index must be set")
-
-        point_set_demands = sim.demand_coverage.point_sets_demands[pcm.index][demand_mode.raster_index]
-        multiplier = float(demand_mode.raster_multiplier)
+        point_set_demands = get_effective_point_sets_demands_mut(
+            sim,
+            priority,
+            current_time,
+            points_coverage_mode=pcm,
+        )
 
         for point_set_idx, station_set in enumerate(pcm.station_sets):
             is_covered = any(
@@ -209,7 +208,7 @@ def _demand_coverage_shortage(sim: "Simulation", stations_num_ambs: List[int]) -
                 for station_idx in station_set
             )
             if not is_covered:
-                shortage += float(point_set_demands[point_set_idx]) * multiplier
+                shortage += float(point_set_demands[point_set_idx])
 
     return shortage
 

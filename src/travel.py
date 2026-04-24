@@ -44,7 +44,7 @@ def get_travel_mode(
     pr_idx = int(priority.value)
 
     travel_mode_index = travel.mode_lookup[travel_set_index][pr_idx]
-    return travel.modes[travel_mode_index - 1]
+    return travel.modes[travel_mode_index]
 
 
 # -------------------------------------------------

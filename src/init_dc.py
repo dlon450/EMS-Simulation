@@ -303,6 +303,197 @@ def update_atom_demands_mut(
     return atoms_demands
 
 
+def calc_point_sets_demands_from_point_demands(
+    points_coverage_mode: PointsCoverageMode,
+    point_demands: List[float],
+) -> List[float]:
+    """Aggregate point demands into the point sets of a coverage mode."""
+
+    if len(point_demands) != len(points_coverage_mode.points):
+        raise AssertionError("point_demands length must match points_coverage_mode.points length")
+
+    point_sets_demand = [0.0] * len(points_coverage_mode.point_sets)
+    for ps_idx, ps in enumerate(points_coverage_mode.point_sets):
+        s = 0.0
+        for pt_idx in ps:
+            s += point_demands[pt_idx]
+        point_sets_demand[ps_idx] = s
+    return point_sets_demand
+
+
+def _call_point_index(sim: Simulation, call) -> int:
+    """Map a call to the nearest demand point (atom), with caching."""
+
+    if call.index is not None and call.index in sim.demand_coverage.call_to_point_lookup:
+        return sim.demand_coverage.call_to_point_lookup[int(call.index)]
+
+    points = sim.demand_coverage.points
+    if not points:
+        raise AssertionError("sim.demand_coverage.points is empty")
+    if call.location.x is None or call.location.y is None:
+        raise AssertionError("call.location must be set")
+
+    candidate_indices: List[int] = []
+    if call.nearest_node_index is not None and 0 <= int(call.nearest_node_index) < len(sim.demand_coverage.nodes_points):
+        candidate_indices = sim.demand_coverage.nodes_points[int(call.nearest_node_index)]
+
+    if not candidate_indices:
+        candidate_indices = list(range(len(points)))
+
+    x_scale = float(sim.map.x_scale or 1.0)
+    y_scale = float(sim.map.y_scale or 1.0)
+    best_pt_idx = min(
+        candidate_indices,
+        key=lambda pt_idx: points[pt_idx].location.distance_to(call.location, x_scale=x_scale, y_scale=y_scale),
+    )
+
+    if call.index is not None:
+        sim.demand_coverage.call_to_point_lookup[int(call.index)] = int(best_pt_idx)
+    return int(best_pt_idx)
+
+
+def estimate_empirical_points_demands_mut(
+    sim: Simulation,
+    current_time: float,
+    *,
+    lookback_duration: float,
+    demand_priorities: Optional[List[Priority]] = None,
+) -> Dict[Priority, List[float]]:
+    """Estimate recent empirical demand per atom from calls in a rolling window."""
+
+    if current_time is None:
+        raise AssertionError("current_time cannot be None")
+    if lookback_duration <= 0.0:
+        raise AssertionError("lookback_duration must be > 0")
+    if not sim.demand_coverage.initialised:
+        raise AssertionError("sim.demand_coverage must be initialised before estimating empirical demand")
+
+    if demand_priorities is None:
+        demand_priorities = list(PRIORITIES)
+
+    priorities_set = set(demand_priorities)
+    num_points = len(sim.demand_coverage.points)
+    empirical_demands: Dict[Priority, List[float]] = {
+        pr: [0.0] * num_points for pr in demand_priorities
+    }
+
+    window_start = float(current_time - lookback_duration)
+    for call in sim.calls[1:]:
+        if call.arrival_time is None:
+            continue
+
+        arrival_time = float(call.arrival_time)
+        if arrival_time >= current_time:
+            break
+        if arrival_time < window_start:
+            continue
+        if call.priority is None or call.priority not in priorities_set:
+            continue
+
+        pt_idx = _call_point_index(sim, call)
+        empirical_demands[call.priority][pt_idx] += 1.0 / float(lookback_duration)
+
+    return empirical_demands
+
+
+def update_blended_demand_estimate_mut(
+    sim: Simulation,
+    current_time: float,
+    *,
+    alpha: float,
+    lookback_duration: float,
+    demand_priorities: Optional[List[Priority]] = None,
+    set_point_values: bool = True,
+) -> Dict[Priority, List[float]]:
+    """Blend baseline point demand with recent empirical demand.
+
+    ``alpha`` is the weight on the empirical estimate:
+    blended = alpha * empirical + (1 - alpha) * baseline
+    """
+
+    if not 0.0 <= alpha <= 1.0:
+        raise AssertionError("alpha must be between 0 and 1")
+    if lookback_duration <= 0.0:
+        raise AssertionError("lookback_duration must be > 0")
+
+    if demand_priorities is None:
+        demand_priorities = list(PRIORITIES)
+
+    baseline_demands: Dict[Priority, List[float]] = {}
+    for pr in demand_priorities:
+        baseline_demands[pr] = get_points_demands_mut(sim, pr, current_time)
+
+    empirical_demands = estimate_empirical_points_demands_mut(
+        sim,
+        current_time,
+        lookback_duration=lookback_duration,
+        demand_priorities=demand_priorities,
+    )
+
+    blended_demands: Dict[Priority, List[float]] = {}
+    for pr in demand_priorities:
+        baseline = baseline_demands[pr]
+        empirical = empirical_demands[pr]
+        blended_demands[pr] = [
+            float(alpha) * empirical[idx] + (1.0 - float(alpha)) * baseline[idx]
+            for idx in range(len(baseline))
+        ]
+
+    sim.demand_coverage.empirical_point_demands = empirical_demands
+    sim.demand_coverage.blended_point_demands = blended_demands
+    sim.demand_coverage.blended_point_demands_set_time = float(current_time)
+
+    if set_point_values:
+        points = sim.demand_coverage.points
+        for pt_idx, point in enumerate(points):
+            point.value = {pr: blended_demands[pr][pt_idx] for pr in demand_priorities}
+
+    return blended_demands
+
+
+def get_effective_point_sets_demands_mut(
+    sim: Simulation,
+    demand_priority: Priority,
+    current_time: float,
+    *,
+    points_coverage_mode: Optional[PointsCoverageMode] = None,
+) -> List[float]:
+    """Return the point-set demand vector used by dispatch at ``current_time``."""
+
+    if points_coverage_mode is None:
+        points_coverage_mode = get_points_coverage_mode_mut(sim, demand_priority, current_time)
+
+    if not sim.use_blended_demand_estimate:
+        raw_point_sets_demands = get_point_sets_demands_mut(
+            sim,
+            demand_priority,
+            current_time,
+            points_coverage_mode=points_coverage_mode,
+        )
+        demand_mode = get_demand_mode(sim.demand, demand_priority, current_time)
+        mult = float(demand_mode.raster_multiplier)
+        return [v * mult for v in raw_point_sets_demands]
+
+    last_update = sim.demand_coverage.blended_point_demands_set_time
+    if (
+        last_update is None
+        or current_time < last_update
+        or current_time >= last_update + float(sim.blended_demand_update_interval)
+        or demand_priority not in sim.demand_coverage.blended_point_demands
+    ):
+        update_blended_demand_estimate_mut(
+            sim,
+            current_time,
+            alpha=float(sim.blended_demand_alpha),
+            lookback_duration=float(sim.blended_demand_lookback_duration),
+            demand_priorities=list(PRIORITIES),
+            set_point_values=True,
+        )
+
+    point_demands = sim.demand_coverage.blended_point_demands[demand_priority]
+    return calc_point_sets_demands_from_point_demands(points_coverage_mode, point_demands)
+
+
 def init_demand(sim: Simulation, demand: Optional[Demand] = None, *, demand_filename: str = "") -> None:
     if demand is None:
         if demand_filename:
@@ -341,7 +532,7 @@ def init_points_coverage_modes(sim: Simulation) -> None:
             tp_col = int(travel_priority.value)
 
             travel_mode_index = travel.mode_lookup[set_i + 1][tp_col]
-            travel_mode = travel.modes[travel_mode_index - 1]
+            travel_mode = travel.modes[travel_mode_index]
             cover_time = dc.cover_times[demand_priority]
 
             tmi = int(travel_mode.index) - 1
